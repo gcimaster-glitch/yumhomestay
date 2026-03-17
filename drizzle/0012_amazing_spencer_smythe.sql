@@ -1,0 +1,23 @@
+CREATE TABLE `leads` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`type` enum('host','cooking_school','agent') NOT NULL,
+	`name` varchar(100) NOT NULL,
+	`company` varchar(200),
+	`email` varchar(255) NOT NULL,
+	`phone` varchar(20) NOT NULL,
+	`prefecture` varchar(50),
+	`nearestStation` varchar(100),
+	`maxGuests` int,
+	`agentRegion` enum('domestic','international','both'),
+	`agentCountry` varchar(100),
+	`agentState` varchar(100),
+	`specialtyRace` varchar(200),
+	`q1Answer` varchar(500),
+	`q2Answer` varchar(500),
+	`status` enum('new','contacted','qualified','converted','rejected') NOT NULL DEFAULT 'new',
+	`notes` text,
+	`repliedAt` timestamp,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `leads_id` PRIMARY KEY(`id`)
+);

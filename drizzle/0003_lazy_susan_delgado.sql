@@ -1,0 +1,20 @@
+CREATE TABLE `experienceReviews` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`experienceId` int,
+	`cookingSchoolId` int,
+	`authorId` int NOT NULL,
+	`authorName` varchar(255),
+	`ratingOverall` int NOT NULL,
+	`ratingFood` int,
+	`ratingHost` int,
+	`ratingValue` int,
+	`titleJa` varchar(255),
+	`titleEn` varchar(255),
+	`commentJa` text,
+	`commentEn` text,
+	`isPublished` boolean NOT NULL DEFAULT true,
+	`isFlagged` boolean NOT NULL DEFAULT false,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `experienceReviews_id` PRIMARY KEY(`id`)
+);

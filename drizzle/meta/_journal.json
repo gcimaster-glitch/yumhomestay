@@ -1,0 +1,125 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1772242282549,
+      "tag": "0000_lucky_pepper_potts",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1772242506600,
+      "tag": "0001_goofy_gideon",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1772246583060,
+      "tag": "0002_chemical_firestar",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1772254276632,
+      "tag": "0003_lazy_susan_delgado",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1772279752945,
+      "tag": "0004_luxuriant_kulan_gath",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1772296444623,
+      "tag": "0005_tense_lady_vermin",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1772297554869,
+      "tag": "0006_flowery_cargill",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1772327760791,
+      "tag": "0007_chunky_the_phantom",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1772362071874,
+      "tag": "0008_premium_quicksilver",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1772379665851,
+      "tag": "0009_short_purple_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1772483630011,
+      "tag": "0010_square_vindicator",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1772493114340,
+      "tag": "0011_zippy_lady_bullseye",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1772524275888,
+      "tag": "0012_amazing_spencer_smythe",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1772538582366,
+      "tag": "0013_silky_gauntlet",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1772540181479,
+      "tag": "0014_purple_owl",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "5",
+      "when": 1772588052532,
+      "tag": "0015_stormy_vector",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "5",
+      "when": 1772590427771,
+      "tag": "0016_lumpy_strong_guy",
+      "breakpoints": true
+    }
+  ]
+}

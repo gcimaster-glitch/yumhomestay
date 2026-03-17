@@ -1,0 +1,38 @@
+CREATE TABLE `cookingSchools` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`userId` int NOT NULL,
+	`nameJa` varchar(255) NOT NULL,
+	`nameEn` varchar(255),
+	`descriptionJa` text,
+	`descriptionEn` text,
+	`websiteUrl` varchar(500),
+	`phoneNumber` varchar(30),
+	`contactEmail` varchar(320),
+	`addressEncrypted` text,
+	`prefecture` varchar(100),
+	`city` varchar(100),
+	`nearestStation` varchar(255),
+	`googleMapsUrl` varchar(500),
+	`maxCapacity` int DEFAULT 20,
+	`hasKitchenEquipment` boolean DEFAULT true,
+	`hasWheelchairAccess` boolean DEFAULT false,
+	`hasHalalKitchen` boolean DEFAULT false,
+	`languages` text,
+	`businessLicenseNumber` varchar(100),
+	`certifications` text,
+	`stripeAccountId` varchar(255),
+	`stripeAccountStatus` enum('pending','active','restricted') DEFAULT 'pending',
+	`profileImageUrl` text,
+	`galleryImageUrls` text,
+	`approvalStatus` enum('pending','interview','approved','rejected','suspended') NOT NULL DEFAULT 'pending',
+	`approvedAt` timestamp,
+	`approvedBy` int,
+	`isActive` boolean NOT NULL DEFAULT false,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `cookingSchools_id` PRIMARY KEY(`id`),
+	CONSTRAINT `cookingSchools_userId_unique` UNIQUE(`userId`)
+);
+--> statement-breakpoint
+ALTER TABLE `hosts` ADD `hostType` enum('individual','cooking_school') DEFAULT 'individual' NOT NULL;--> statement-breakpoint
+ALTER TABLE `hosts` ADD `cookingSchoolId` int;

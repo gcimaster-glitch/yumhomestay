@@ -1,0 +1,1 @@
+ALTER TABLE `guestInquiries` ADD `preferredHostId` int;

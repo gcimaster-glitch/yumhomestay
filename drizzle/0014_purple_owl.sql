@@ -1,0 +1,1 @@
+ALTER TABLE `leads` ADD `accessToken` varchar(64);
