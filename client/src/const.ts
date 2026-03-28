@@ -7,9 +7,8 @@ export const getLoginUrl = () => {
   const redirectUri = `${window.location.origin}/api/oauth/callback`;
   const state = btoa(redirectUri);
 
-  // Guard against missing environment variables
+  // VITE_OAUTH_PORTAL_URL が未設定の場合はログインページにリダイレクト（警告ログなし）
   if (!oauthPortalUrl || oauthPortalUrl === 'undefined') {
-    console.warn('[Auth] VITE_OAUTH_PORTAL_URL is not configured');
     return '/login';
   }
 
@@ -21,7 +20,6 @@ export const getLoginUrl = () => {
     url.searchParams.set("type", "signIn");
     return url.toString();
   } catch (e) {
-    console.warn('[Auth] Failed to construct login URL:', e);
     return '/login';
   }
 };

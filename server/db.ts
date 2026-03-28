@@ -45,13 +45,20 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      const connection = await mysql.createConnection({
+      // createPool を使用して接続プールを作成する。
+      // createConnection と異なり、プールはアイドルタイムアウト後に自動再接続するため
+      // 「Can't add new command when connection is in closed state」エラーを防ぐ。
+      const pool = mysql.createPool({
         uri: process.env.DATABASE_URL,
         ssl: { rejectUnauthorized: true },
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
       });
-      _db = drizzle(connection);
+      _db = drizzle(pool);
+      console.log("[Database] Connection pool initialized");
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.warn("[Database] Failed to initialize pool:", error);
       _db = null;
     }
   }
