@@ -39,6 +39,7 @@ const HostRegisterPaymentSuccess = lazy(() => import("./pages/HostRegisterPaymen
 const TroubleReport        = lazy(() => import("./pages/TroubleReport"));
 const VerifyEmail          = lazy(() => import("./pages/VerifyEmail"));
 const DemoLogin            = lazy(() => import("./pages/DemoLogin"));
+const Login                = lazy(() => import("./pages/Login"));
 const DemoHost             = lazy(() => import("./pages/DemoHost"));
 const DemoCookingSchool    = lazy(() => import("./pages/DemoCookingSchool"));
 const DemoAgent            = lazy(() => import("./pages/DemoAgent"));
@@ -143,6 +144,9 @@ function Router() {
 
         {/* Email Verification */}
         <Route path="/verify-email" component={VerifyEmail} />
+
+        {/* Login (OAuth未設定時のフォールバック) */}
+        <Route path="/login" component={Login} />
 
         {/* Demo Login (共通・後方互換) */}
         <Route path="/demo" component={DemoLogin} />

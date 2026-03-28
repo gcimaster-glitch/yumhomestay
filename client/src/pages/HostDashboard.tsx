@@ -380,7 +380,7 @@ export default function HostDashboard() {
 
           {/* Chat tab */}
           <TabsContent value="chat" className="mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4" style={{ height: "560px" }}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-h-[400px] md:h-[clamp(400px,calc(100vh-280px),700px)]">
               {/* Thread list */}
               <div className="border rounded-lg overflow-y-auto">
                 <div className="p-3 border-b bg-muted/30">

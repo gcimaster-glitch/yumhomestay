@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getLoginUrl } from "@/const";
 import { SUPPORTED_LANGUAGES } from "@/i18n";
-import { Briefcase, ChevronDown, ClipboardList, Globe, Menu, UtensilsCrossed, X } from "lucide-react";
+import { Briefcase, ChevronDown, ChevronRight, ClipboardList, Globe, Menu, UtensilsCrossed, X } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "wouter";
@@ -19,6 +19,7 @@ export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [partnerOpen, setPartnerOpen] = useState(false);
 
   const navLinks = [
     { href: "/experiences", label: t("nav.experiences") },
@@ -37,28 +38,32 @@ export default function Navbar() {
   return (
     <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-border shadow-sm">
       <div className="container">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 font-bold text-xl text-primary">
+        <div className="flex items-center justify-between h-16 gap-2">
+
+          {/* ─── ロゴ ─────────────────────────────────────────────────── */}
+          <Link href="/" className="flex items-center gap-2 font-bold text-xl text-primary shrink-0">
             <UtensilsCrossed className="w-6 h-6" />
-            <span>YumHomeStay</span>
+            <span className="hidden sm:inline">YumHomeStay</span>
+            <span className="sm:hidden">YumHS</span>
           </Link>
 
-          {/* Desktop nav */}
-          <div className="hidden md:flex items-center gap-6">
+          {/* ─── デスクトップナビ（lg以上：1024px〜） ─────────────────── */}
+          <div className="hidden lg:flex items-center gap-4 flex-1 justify-center">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors"
+                className={`text-sm font-medium transition-colors whitespace-nowrap ${
+                  location === link.href ? "text-primary" : "text-foreground/70 hover:text-primary"
+                }`}
               >
                 {link.label}
               </Link>
             ))}
-            {/* Partner dropdown */}
+            {/* パートナードロップダウン */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-1 text-sm font-medium text-foreground/70 hover:text-primary transition-colors">
+                <button className="flex items-center gap-1 text-sm font-medium text-foreground/70 hover:text-primary transition-colors whitespace-nowrap">
                   <Briefcase className="w-3.5 h-3.5" />
                   {t("nav.partners", "パートナー")}
                   <ChevronDown className="w-3 h-3" />
@@ -77,22 +82,17 @@ export default function Navbar() {
             </DropdownMenu>
           </div>
 
-          {/* Apply CTA */}
-          <div className="hidden md:block">
+          {/* ─── 右サイド（lg以上：フル表示） ────────────────────────── */}
+          <div className="hidden lg:flex items-center gap-2 shrink-0">
             <Link href="/apply">
-              <Button size="sm" className="gap-1.5 bg-primary hover:bg-primary/90">
+              <Button size="sm" className="gap-1.5 bg-primary hover:bg-primary/90 whitespace-nowrap">
                 <ClipboardList className="w-3.5 h-3.5" />
                 {t("nav.apply")}
               </Button>
             </Link>
-          </div>
-
-          {/* Right side */}
-          <div className="hidden md:flex items-center gap-3">
-            {/* Language switcher */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-1">
+                <Button variant="ghost" size="sm" className="gap-1 px-2">
                   <Globe className="w-4 h-4" />
                   <span className="text-xs uppercase">{i18n.language.slice(0, 2)}</span>
                   <ChevronDown className="w-3 h-3" />
@@ -110,136 +110,170 @@ export default function Navbar() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-
             {isAuthenticated ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <span className="max-w-24 truncate">{user?.name ?? user?.email ?? "User"}</span>
-                    <ChevronDown className="w-3 h-3" />
+                  <Button variant="outline" size="sm" className="gap-2 max-w-[140px]">
+                    <span className="truncate">{user?.name ?? user?.email ?? "User"}</span>
+                    <ChevronDown className="w-3 h-3 shrink-0" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link href="/bookings">{t("nav.myBookings")}</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/host/dashboard">{t("host.dashboard")}</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/cooking-school/dashboard">{t("nav.cookingSchoolDashboard")}</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/agent/dashboard">{t("nav.agentDashboard")}</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/my-inquiries">{t("nav.myInquiries")}</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/profile">{t("nav.profile")}</Link>
-                  </DropdownMenuItem>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuItem asChild><Link href="/bookings">{t("nav.myBookings")}</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link href="/host/dashboard">{t("host.dashboard")}</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link href="/cooking-school/dashboard">{t("nav.cookingSchoolDashboard")}</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link href="/agent/dashboard">{t("nav.agentDashboard")}</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link href="/my-inquiries">{t("nav.myInquiries")}</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link href="/profile">{t("nav.profile")}</Link></DropdownMenuItem>
                   {user?.role === "admin" && (
                     <>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild>
-                        <Link href="/admin">{t("admin.dashboard")}</Link>
-                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild><Link href="/admin">{t("admin.dashboard")}</Link></DropdownMenuItem>
                     </>
                   )}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => logout()} className="text-destructive">
-                    {t("nav.logout")}
-                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => logout()} className="text-destructive">{t("nav.logout")}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button size="sm" asChild>
+              <Button size="sm" variant="outline" asChild>
                 <a href={getLoginUrl()}>{t("nav.login")}</a>
               </Button>
             )}
           </div>
 
-          {/* Mobile menu toggle */}
+          {/* ─── ハンバーガーボタン（lg未満：1023px以下） ────────────── */}
           <button
-            className="md:hidden p-2 text-foreground"
+            className="lg:hidden p-2 text-foreground rounded-md hover:bg-muted transition-colors"
             onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label={mobileOpen ? "メニューを閉じる" : "メニューを開く"}
           >
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
 
-      {/* Mobile menu */}
+      {/* ─── モバイル・タブレットメニュー（lg未満：1023px以下） ──────── */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-border bg-background/95 backdrop-blur-md px-4 py-4 space-y-3 max-h-[80vh] overflow-y-auto">
+        <div className="lg:hidden border-t border-border bg-background/98 backdrop-blur-md px-4 py-3 space-y-1 max-h-[85vh] overflow-y-auto">
+          {/* メインナビ */}
           {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="block text-sm font-medium text-foreground/70 hover:text-primary py-2.5"
+              className={`flex items-center justify-between text-sm font-medium py-3 px-2 rounded-lg transition-colors ${
+                location === link.href
+                  ? "text-primary bg-primary/5"
+                  : "text-foreground/70 hover:text-primary hover:bg-muted"
+              }`}
               onClick={() => setMobileOpen(false)}
             >
               {link.label}
+              <ChevronRight className="w-3.5 h-3.5 opacity-40" />
             </Link>
           ))}
-          <div className="border-t border-border pt-2">
-            <p className="text-xs text-muted-foreground font-medium mb-1">{t("nav.partners", "パートナー")}</p>
-            {partnerLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="block text-sm font-medium text-foreground/70 hover:text-primary py-2.5"
-                onClick={() => setMobileOpen(false)}
-              >
-                {link.label}
-              </Link>
-            ))}
+
+          {/* パートナーセクション（展開可能） */}
+          <div className="border-t border-border pt-2 mt-1">
+            <button
+              className="flex items-center justify-between w-full text-sm font-medium text-muted-foreground py-3 px-2 rounded-lg hover:bg-muted transition-colors"
+              onClick={() => setPartnerOpen(!partnerOpen)}
+            >
+              <span className="flex items-center gap-2">
+                <Briefcase className="w-4 h-4" />
+                {t("nav.partners", "パートナー")}
+              </span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${partnerOpen ? "rotate-180" : ""}`} />
+            </button>
+            {partnerOpen && (
+              <div className="pl-4 space-y-1 mt-1">
+                {partnerLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="flex flex-col py-2.5 px-2 rounded-lg hover:bg-muted transition-colors"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    <span className="text-sm font-medium text-foreground/80">{link.label}</span>
+                    <span className="text-xs text-muted-foreground mt-0.5">{link.desc}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
-          <Link href="/apply" onClick={() => setMobileOpen(false)}>
-            <Button size="sm" className="w-full gap-1.5 mt-1">
-              <ClipboardList className="w-3.5 h-3.5" />
-              {t("hero.ctaApply")}
-            </Button>
-          </Link>
+
+          {/* Apply CTA */}
+          <div className="pt-2">
+            <Link href="/apply" onClick={() => setMobileOpen(false)}>
+              <Button size="sm" className="w-full gap-1.5">
+                <ClipboardList className="w-3.5 h-3.5" />
+                {t("hero.ctaApply")}
+              </Button>
+            </Link>
+          </div>
+
+          {/* ログイン / ユーザーメニュー */}
           <div className="pt-2 border-t border-border">
             {isAuthenticated ? (
-              <div className="space-y-2">
-                <Link href="/bookings" className="block text-sm py-2.5" onClick={() => setMobileOpen(false)}>
-                  {t("nav.myBookings")}
-                </Link>
-                <Link href="/my-inquiries" className="block text-sm py-2.5" onClick={() => setMobileOpen(false)}>
-                  {t("nav.myInquiries")}
-                </Link>
-                <Link href="/profile" className="block text-sm py-2.5" onClick={() => setMobileOpen(false)}>
-                  {t("nav.profile")}
-                </Link>
-                <Link href="/host/dashboard" className="block text-sm py-2.5" onClick={() => setMobileOpen(false)}>
-                  {t("host.dashboard")}
-                </Link>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground px-2 py-1 font-medium">
+                  {user?.name ?? user?.email ?? "User"}
+                </p>
+                {[
+                  { href: "/bookings", label: t("nav.myBookings") },
+                  { href: "/my-inquiries", label: t("nav.myInquiries") },
+                  { href: "/profile", label: t("nav.profile") },
+                  { href: "/host/dashboard", label: t("host.dashboard") },
+                  { href: "/cooking-school/dashboard", label: t("nav.cookingSchoolDashboard") },
+                  { href: "/agent/dashboard", label: t("nav.agentDashboard") },
+                ].map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="flex items-center justify-between text-sm py-2.5 px-2 rounded-lg text-foreground/70 hover:text-primary hover:bg-muted transition-colors"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    {item.label}
+                    <ChevronRight className="w-3.5 h-3.5 opacity-40" />
+                  </Link>
+                ))}
                 {user?.role === "admin" && (
-                  <Link href="/admin" className="block text-sm py-2.5" onClick={() => setMobileOpen(false)}>
+                  <Link
+                    href="/admin"
+                    className="flex items-center justify-between text-sm py-2.5 px-2 rounded-lg text-foreground/70 hover:text-primary hover:bg-muted transition-colors"
+                    onClick={() => setMobileOpen(false)}
+                  >
                     {t("admin.dashboard")}
+                    <ChevronRight className="w-3.5 h-3.5 opacity-40" />
                   </Link>
                 )}
-                <button onClick={() => logout()} className="block w-full text-left text-sm text-destructive py-2.5">
+                <button
+                  onClick={() => { logout(); setMobileOpen(false); }}
+                  className="flex w-full items-center text-sm text-destructive py-2.5 px-2 rounded-lg hover:bg-destructive/5 transition-colors"
+                >
                   {t("nav.logout")}
                 </button>
               </div>
             ) : (
-              <a href={getLoginUrl()} className="block">
-                <Button size="sm" className="w-full">{t("nav.login")}</Button>
+              <a href={getLoginUrl()} className="block" onClick={() => setMobileOpen(false)}>
+                <Button size="sm" variant="outline" className="w-full">{t("nav.login")}</Button>
               </a>
             )}
           </div>
-          {/* Language switcher mobile */}
-          <div className="flex gap-2 pt-2">
+
+          {/* 言語切り替え */}
+          <div className="flex flex-wrap gap-2 pt-2 pb-1 border-t border-border">
             {SUPPORTED_LANGUAGES.map((lang) => (
               <button
                 key={lang.code}
                 onClick={() => { i18n.changeLanguage(lang.code); setMobileOpen(false); }}
-                className={`text-xs px-2 py-1 rounded border ${i18n.language.startsWith(lang.code) ? "border-primary text-primary font-semibold" : "border-border text-muted-foreground"}`}
+                className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
+                  i18n.language.startsWith(lang.code)
+                    ? "border-primary text-primary font-semibold bg-primary/5"
+                    : "border-border text-muted-foreground hover:border-primary/50"
+                }`}
               >
-                {lang.flag}
+                {lang.flag} <span>{lang.label}</span>
               </button>
             ))}
           </div>

@@ -842,7 +842,7 @@ export default function AdminDashboard() {
 
           {/* ─── Chat management tab ─────────────────────────────────────────────── */}
           <TabsContent value="chat" className="mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[600px]">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-h-[400px] md:h-[calc(100vh-280px)] md:max-h-[700px]">
               {/* Left: list of active chat threads */}
               <div className="md:col-span-1 border rounded-xl overflow-y-auto bg-card">
                 <div className="p-3 border-b">

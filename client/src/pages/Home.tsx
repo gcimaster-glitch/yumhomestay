@@ -633,7 +633,7 @@ export default function Home() {
         <button
           onClick={nextSlide}
           aria-label="Next slide"
-          className="absolute right-4 lg:right-[17rem] top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center backdrop-blur-sm transition-colors"
+          className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center backdrop-blur-sm transition-colors"
         >
           <ChevronRight className="w-5 h-5" />
         </button>
