@@ -13,7 +13,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 COPY patches/ ./patches/
 
-# 依存関係インストール
+# 全依存関係インストール（ビルドにdevDepsが必要）
 RUN pnpm install --frozen-lockfile
 
 # ソースコードをコピー
@@ -23,18 +23,23 @@ COPY . .
 RUN pnpm run build
 
 # ============================================================
-# Stage 2: 本番実行ステージ（軽量イメージ）
+# Stage 2: 本番実行ステージ
+# dist/index.js は --packages=external でビルドされているため
+# 実行時にも全 node_modules が必要
 # ============================================================
 FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# 本番用依存関係のみインストール
+# pnpm をグローバルインストール
 RUN npm install -g pnpm@10.4.1
 
+# 依存関係ファイルをコピー
 COPY package.json pnpm-lock.yaml ./
 COPY patches/ ./patches/
-RUN pnpm install --frozen-lockfile --prod
+
+# 全依存関係インストール（vite等のdevDepsも実行時に必要）
+RUN pnpm install --frozen-lockfile
 
 # ビルド成果物をコピー
 COPY --from=builder /app/dist ./dist
