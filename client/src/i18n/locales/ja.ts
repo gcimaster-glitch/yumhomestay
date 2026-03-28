@@ -122,6 +122,7 @@ export const ja = {
     allAreas: "すべてのエリア",
     allCuisines: "すべての料理",
     allDietary: "すべて",
+    filter: "絞り込み",
   },
   experience: {
     perPerson: "円 / 人",
@@ -1927,5 +1928,6 @@ badge: "法的情報",
     ctaTitle: "あなたの日本体験を始めましょう",
     ctaDesc: "ホストを選んで申し込む必要はありません。お申し込み後、担当スタッフが最適なホストをマッチングします。",
     ctaButton: "今すぐ申し込む",
+    allLanguages: "すべての言語",
   },
 };

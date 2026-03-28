@@ -117,6 +117,7 @@ export const ko = {
     allAreas: "모든 지역",
     allCuisines: "모든 요리",
     allDietary: "전체",
+    filter: "필터",
   },
   experience: {
     perPerson: "엔 / 인",
@@ -1921,5 +1922,6 @@ badge: "법적 정보",
     ctaTitle: "일본 체험을 시작하세요",
     ctaDesc: "호스트를 선택할 필요가 없습니다. 신청 후 담당 스태프가 최적의 호스트 가족을 매칭합니다.",
     ctaButton: "지금 신청하기",
+    allLanguages: "모든 언어",
   },
 };

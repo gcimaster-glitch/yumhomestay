@@ -68,8 +68,8 @@ export default function Experiences() {
   const [filterCSPref, setFilterCSPref] = useState<string>("all");
   const [filterCSCuisine, setFilterCSCuisine] = useState<string>("all");
 
-  const { data: experiences, isLoading } = trpc.experience.list.useQuery({ limit: 100, offset: 0 });
-  const { data: cookingSchools, isLoading: loadingCS } = trpc.cookingSchool.list.useQuery({ limit: 100, offset: 0 });
+  const { data: experiences, isLoading } = trpc.experience.list.useQuery({ limit: 50, offset: 0 });
+  const { data: cookingSchools, isLoading: loadingCS } = trpc.cookingSchool.list.useQuery({ limit: 50, offset: 0 });
 
   // Derive unique cuisine types from data
   const cuisineTypes = useMemo(() => {

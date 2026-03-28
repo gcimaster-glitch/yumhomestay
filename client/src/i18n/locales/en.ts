@@ -122,6 +122,7 @@ export const en = {
     allAreas: "All Areas",
     allCuisines: "All Cuisines",
     allDietary: "All",
+    filter: "Filter",
   },
   experience: {
     perPerson: "¥ / person",
@@ -1968,5 +1969,6 @@ badge: "Legal Information",
     ctaTitle: "Start Your Japanese Experience",
     ctaDesc: "No need to choose a host. After you apply, our staff will match you with the perfect host family.",
     ctaButton: "Apply Now",
+    allLanguages: "All Languages",
   },
 };

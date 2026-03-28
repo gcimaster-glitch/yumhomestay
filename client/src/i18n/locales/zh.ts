@@ -117,6 +117,7 @@ export const zh = {
     allAreas: "所有地区",
     allCuisines: "所有料理",
     allDietary: "全部",
+    filter: "筛选",
   },
   experience: {
     perPerson: "元 / 人",
@@ -1906,5 +1907,6 @@ badge: "法律信息",
     ctaTitle: "开始您的日本体验",
     ctaDesc: "无需选择主人。申请后，我们的工作人员将为您匹配最佳主人家庭。",
     ctaButton: "立即申请",
+    allLanguages: "所有语言",
   },
 };
