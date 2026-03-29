@@ -17,6 +17,15 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
+  // ─── 独自認証フィールド ─────────────────────────────────────────────────────────
+  passwordHash: text("passwordHash"),                    // bcrypt hash (email auth)
+  emailVerified: boolean("emailVerified").default(false).notNull(), // メール確認済み
+  googleId: varchar("googleId", { length: 255 }),        // Google OAuth sub
+  lineId: varchar("lineId", { length: 255 }),            // LINE userId
+  avatarUrl: text("avatarUrl"),                          // プロフィール画像URL
+  // ─── 利用規約同意 ──────────────────────────────────────────────────────────────
+  termsAgreedAt: timestamp("termsAgreedAt"),             // 利用規約同意日時（法的証拠）
+  termsVersion: varchar("termsVersion", { length: 20 }), // 同意した規約バージョン
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   // Extended fields for YHS
   userType: mysqlEnum("userType", ["guest", "host", "agent", "admin"]).default("guest").notNull(),
@@ -663,3 +672,30 @@ export const kycSubmissions = mysqlTable("kycSubmissions", {
 });
 export type KycSubmission = typeof kycSubmissions.$inferSelect;
 export type InsertKycSubmission = typeof kycSubmissions.$inferInsert;
+
+// ─── パスワードリセットトークン ──────────────────────────────────────────────────
+// メール認証ユーザーのパスワードリセット用トークン（1時間有効）
+export const passwordResetTokens = mysqlTable("passwordResetTokens", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),            // FK → users.id
+  token: varchar("token", { length: 128 }).notNull().unique(), // ランダムトークン
+  expiresAt: timestamp("expiresAt").notNull(), // 有効期限（1時間）
+  usedAt: timestamp("usedAt"),               // 使用済み日時（null = 未使用）
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;
+
+// ─── 新規登録メール確認トークン ──────────────────────────────────────────────────
+// 新規登録時のメールアドレス確認用トークン（24時間有効）
+export const emailSignupTokens = mysqlTable("emailSignupTokens", {
+  id: int("id").autoincrement().primaryKey(),
+  email: varchar("email", { length: 320 }).notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  passwordHash: text("passwordHash").notNull(), // 仮保存（確認後にusersに移行）
+  token: varchar("token", { length: 128 }).notNull().unique(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  usedAt: timestamp("usedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type EmailSignupToken = typeof emailSignupTokens.$inferSelect;

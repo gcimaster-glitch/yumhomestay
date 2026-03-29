@@ -298,20 +298,6 @@ export const stripeRouter = router({
 
 /** Register the Stripe webhook endpoint on the Express app */
 export function registerStripeWebhook(app: import("express").Express) {
-  // Temporary debug endpoint to check what secrets are available in production
-  // TODO: Remove after debugging
-  app.get("/api/stripe/webhook-debug", (_req, res) => {
-    const s1 = process.env.STRIPE_WEBHOOK_SECRET;
-    const s2 = process.env.STRIPE_WEBHOOK_SEACRET;
-    const s3 = process.env.STRIPE_WEBHOOK_SECRET_PROD;
-    res.json({
-      STRIPE_WEBHOOK_SECRET_PROD: s3 ? s3.slice(0, 12) + '...' : null,
-      STRIPE_WEBHOOK_SECRET: s1 ? s1.slice(0, 12) + '...' : null,
-      STRIPE_WEBHOOK_SEACRET: s2 ? s2.slice(0, 12) + '...' : null,
-      NODE_ENV: process.env.NODE_ENV,
-    });
-  });
-
   // Stripe webhook route with inline raw body parser to ensure raw body is preserved
   app.post("/api/stripe/webhook", express.raw({ type: "*/*" }), async (req, res) => {
     if (!stripe) {
@@ -427,6 +413,49 @@ export function registerStripeWebhook(app: import("express").Express) {
                 .set({ status: "confirmed", confirmedAt: new Date(), updatedAt: new Date() })
                 .where(eq(bookings.id, bookingId));
               console.log(`[Stripe Webhook] Booking #${bookingId} confirmed after payment`);
+              // Send booking confirmation emails to guest and host
+              try {
+                const { sendBookingConfirmationToGuest, sendHostBookingNotification } = await import("../email");
+                const { users: usersTable, experiences: experiencesTable, hosts: hostsTable } = await import("../../drizzle/schema");
+                const [booking] = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
+                if (booking) {
+                  const [guest] = await db.select().from(usersTable).where(eq(usersTable.id, booking.guestId)).limit(1);
+                  const [experience] = await db.select().from(experiencesTable).where(eq(experiencesTable.id, booking.experienceId)).limit(1);
+                  // Notify host
+                  const [host] = await db.select().from(hostsTable).where(eq(hostsTable.id, experience?.hostId ?? 0)).limit(1);
+                  const [hostUser] = host ? await db.select().from(usersTable).where(eq(usersTable.id, host.userId)).limit(1) : [];
+                  const guestCount = booking.adultsCount + booking.childrenCount + (booking.infantsCount ?? 0);
+                  if (guest?.email && experience) {
+                    await sendBookingConfirmationToGuest({
+                      to: guest.email,
+                      guestName: guest.name ?? "ゲスト",
+                      experienceTitle: experience.title,
+                      hostName: hostUser?.name ?? "ホスト",
+                      startTime: booking.startTime,
+                      guestCount,
+                      totalAmountJpy: booking.amountJpy,
+                      currency: booking.currency,
+                      totalAmountForeign: booking.amountTotal / 100,
+                      bookingId: booking.id,
+                    });
+                  }
+                  if (hostUser?.email && experience) {
+                    await sendHostBookingNotification({
+                      to: hostUser.email,
+                      hostName: hostUser.name ?? "ホスト",
+                      guestName: guest?.name ?? "ゲスト",
+                      guestCountry: guest?.country ?? "不明",
+                      experienceTitle: experience.title,
+                      startTime: booking.startTime,
+                      guestCount,
+                      hostPayoutJpy: booking.hostPayoutJpy,
+                      bookingId: booking.id,
+                    });
+                  }
+                }
+              } catch (emailErr) {
+                console.error("[Stripe Webhook] Failed to send booking confirmation emails:", emailErr);
+              }
             }
           }
           break;

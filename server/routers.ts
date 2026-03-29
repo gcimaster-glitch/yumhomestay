@@ -19,6 +19,7 @@ import { chatRouter } from "./routers/chat";
 import { leadRouter } from "./routers/lead";
 import { contactRouter } from "./routers/contact";
 import { kycRouter } from "./routers/kyc";
+import { authRouter } from "./routers/auth";
 
 export const appRouter = router({
   system: systemRouter,
@@ -29,6 +30,14 @@ export const appRouter = router({
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
+    // 独自認証（メール/パスワード・Google・LINE）
+    register: authRouter.registerStep1,
+    loginWithEmail: authRouter.loginWithEmail,
+    requestPasswordReset: authRouter.requestPasswordReset,
+    resetPassword: authRouter.resetPassword,
+    agreeToTerms: authRouter.agreeToTerms,
+    getGoogleAuthUrl: authRouter.getGoogleAuthUrl,
+    getLineAuthUrl: authRouter.getLineAuthUrl,
   }),
   user: userRouter,
   host: hostRouter,

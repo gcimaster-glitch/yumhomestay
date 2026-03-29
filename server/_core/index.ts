@@ -1,14 +1,41 @@
 import "dotenv/config";
-import express from "express";
+import crypto from "crypto";
 import { createServer } from "http";
 import net from "net";
+import express from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
+import { registerAuthRoutes } from "./authRoutes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+
+// ─── 起動時環境変数チェック ──────────────────────────────────────────────────
+// JWT_SECRETが未設定の場合は自動生成（本番環境では必ず明示的に設定すること）
+if (!process.env.JWT_SECRET) {
+  const autoSecret = crypto.randomBytes(64).toString("hex");
+  process.env.JWT_SECRET = autoSecret;
+  if (process.env.NODE_ENV === "production") {
+    console.error("[CRITICAL] JWT_SECRET is not set in production! Sessions will be invalidated on every restart.");
+    console.error("[CRITICAL] Set JWT_SECRET environment variable to a 64+ character random string.");
+  } else {
+    console.warn("[Auth] JWT_SECRET not set, using auto-generated secret (development only)");
+  }
+}
+
+// 重要な環境変数の設定状況をログ出力
+const ENV_STATUS = {
+  JWT_SECRET: !!process.env.JWT_SECRET ? "✅ set" : "❌ NOT SET",
+  DATABASE_URL: !!process.env.DATABASE_URL ? "✅ set" : "❌ NOT SET",
+  STRIPE_SECRET_KEY: !!process.env.STRIPE_SECRET_KEY ? "✅ set" : "⚠️  not set (payments disabled)",
+  RESEND_API_KEY: !!process.env.RESEND_API_KEY ? "✅ set" : "⚠️  not set (emails disabled)",
+  GOOGLE_CLIENT_ID: !!process.env.GOOGLE_CLIENT_ID ? "✅ set" : "⚠️  not set (Google login disabled)",
+  LINE_CLIENT_ID: !!process.env.LINE_CLIENT_ID ? "✅ set" : "⚠️  not set (LINE login disabled)",
+};
+console.log("[Startup] Environment variable status:");
+Object.entries(ENV_STATUS).forEach(([key, status]) => console.log(`  ${key}: ${status}`));
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -66,8 +93,11 @@ async function startServer() {
   // NOTE: Stripe webhook raw body parsing is handled inline in registerStripeWebhook()
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // OAuth callback under /api/oauth/callback
+  // OAuth callback under /api/oauth/callback (Manus legacy)
   registerOAuthRoutes(app);
+  // 独自認証ルート（Google・LINE・メール確認）
+  app.use("/api/auth", authLimiter);
+  registerAuthRoutes(app);
   // Stripe webhook endpoint
   const { registerStripeWebhook } = await import("../routers/stripe");
   registerStripeWebhook(app);

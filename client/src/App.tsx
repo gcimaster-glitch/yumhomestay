@@ -5,6 +5,9 @@ import { Route, Switch, useLocation } from "wouter";
 import { useEffect, lazy, Suspense } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { useAuth } from "./_core/hooks/useAuth";
+import TermsAgreementModal from "./components/TermsAgreementModal";
+import { trpc } from "@/lib/trpc";
 
 // ─── Eager-loaded pages (critical path: LCP / first-paint) ───────────────────
 // Home・Experiences・CookingSchools は初回アクセスで最も多く使われるため即時ロード
@@ -38,6 +41,7 @@ const PaymentCancel        = lazy(() => import("./pages/PaymentCancel"));
 const HostRegisterPaymentSuccess = lazy(() => import("./pages/HostRegisterPaymentSuccess"));
 const TroubleReport        = lazy(() => import("./pages/TroubleReport"));
 const VerifyEmail          = lazy(() => import("./pages/VerifyEmail"));
+const ResetPassword        = lazy(() => import("./pages/ResetPassword"));
 const DemoLogin            = lazy(() => import("./pages/DemoLogin"));
 const Login                = lazy(() => import("./pages/Login"));
 const DemoHost             = lazy(() => import("./pages/DemoHost"));
@@ -145,6 +149,9 @@ function Router() {
         {/* Email Verification */}
         <Route path="/verify-email" component={VerifyEmail} />
 
+        {/* Password Reset */}
+        <Route path="/reset-password" component={ResetPassword} />
+
         {/* Login (OAuth未設定時のフォールバック) */}
         <Route path="/login" component={Login} />
 
@@ -175,6 +182,32 @@ function Router() {
   );
 }
 
+// 利用規約同意モーダルの表示制御
+function TermsGuard({ children }: { children: React.ReactNode }) {
+  const { user, isAuthenticated, loading, refresh } = useAuth();
+  const utils = trpc.useUtils();
+
+  // 認証済みかつ termsAgreedAt が null の場合にモーダル表示
+  const needsTermsAgreement = isAuthenticated && user && !user.termsAgreedAt;
+
+  if (loading) return <>{children}</>;
+
+  return (
+    <>
+      {children}
+      {needsTermsAgreement && (
+        <TermsAgreementModal
+          onAgreed={() => {
+            // 同意後はユーザー情報を再取得してモーダルを閉じる
+            utils.auth.me.invalidate();
+            refresh();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -182,7 +215,9 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <TermsGuard>
+            <Router />
+          </TermsGuard>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

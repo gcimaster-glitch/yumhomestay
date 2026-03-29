@@ -32,12 +32,17 @@ export function useAuth(options?: UseAuthOptions) {
         error instanceof TRPCClientError &&
         error.data?.code === "UNAUTHORIZED"
       ) {
-        return;
+        // already logged out
+      } else {
+        console.error("[Auth] Logout error:", error);
       }
-      throw error;
     } finally {
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
+      // ログアウト後はTOPページへ遷移（ログインページではなく）
+      if (typeof window !== "undefined" && window.location.pathname !== "/") {
+        window.location.href = "/";
+      }
     }
   }, [logoutMutation, utils]);
 

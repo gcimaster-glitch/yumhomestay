@@ -1156,3 +1156,51 @@ export async function sendLeadReplyEmail(params: {
     <p>ご不明な点がございましたら、お気軽にご返信ください。</p>`;
   return sendEmail({ to, subject, html: baseTemplate(body, "ja") });
 }
+
+// ─── パスワードリセットメール ──────────────────────────────────────────────────
+export async function sendPasswordResetEmail(params: {
+  to: string;
+  name: string;
+  resetUrl: string;
+}): Promise<boolean> {
+  const { to, name, resetUrl } = params;
+  const subject = "【YumHomeStay】パスワードリセットのご案内";
+  const body = `
+    <h2>パスワードリセット</h2>
+    <p>${name} 様</p>
+    <p>パスワードリセットのリクエストを受け付けました。<br>
+    以下のボタンをクリックして、新しいパスワードを設定してください。</p>
+    <p style="text-align:center;margin:32px 0;">
+      <a href="${resetUrl}" class="btn">パスワードをリセットする</a>
+    </p>
+    <div class="info-box">
+      <p style="margin:0;font-size:13px;color:#868e96;">
+        このリンクは<strong>1時間</strong>で無効になります。<br>
+        身に覚えのない場合は、このメールを無視してください。
+      </p>
+    </div>`;
+  return sendEmail({ to, subject, html: baseTemplate(body, "ja") });
+}
+
+// ─── ウェルカムメール（登録完了後）──────────────────────────────────────────────
+export async function sendWelcomeEmail(params: {
+  to: string;
+  name: string;
+}): Promise<boolean> {
+  const { to, name } = params;
+  const subject = "【YumHomeStay】ご登録ありがとうございます";
+  const body = `
+    <h2>ようこそ、YumHomeStayへ！</h2>
+    <p>${name} 様</p>
+    <p>YumHomeStayへのご登録が完了しました。<br>
+    日本のホームステイ体験を通じて、素晴らしい思い出をお作りください。</p>
+    <p style="text-align:center;margin:32px 0;">
+      <a href="https://www.yumhomestay.com" class="btn">サイトを見る</a>
+    </p>
+    <div class="info-box">
+      <p style="margin:0;font-size:13px;">
+        ご不明な点がございましたら、お問い合わせページからご連絡ください。
+      </p>
+    </div>`;
+  return sendEmail({ to, subject, html: baseTemplate(body, "ja") });
+}

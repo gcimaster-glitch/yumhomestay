@@ -136,9 +136,14 @@ export default function Navbar() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button size="sm" variant="outline" asChild>
-                <a href={getLoginUrl()}>{t("nav.login")}</a>
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="ghost" asChild>
+                  <Link href="/login">{t("nav.login")}</Link>
+                </Button>
+                <Button size="sm" asChild>
+                  <Link href="/login?tab=register">{t("nav.register") || "無料登録"}</Link>
+                </Button>
+              </div>
             )}
           </div>
 
@@ -255,9 +260,14 @@ export default function Navbar() {
                 </button>
               </div>
             ) : (
-              <a href={getLoginUrl()} className="block" onClick={() => setMobileOpen(false)}>
-                <Button size="sm" variant="outline" className="w-full">{t("nav.login")}</Button>
-              </a>
+              <div className="space-y-2">
+                <Link href="/login" onClick={() => setMobileOpen(false)}>
+                  <Button size="sm" variant="outline" className="w-full">{t("nav.login")}</Button>
+                </Link>
+                <Link href="/login?tab=register" onClick={() => setMobileOpen(false)}>
+                  <Button size="sm" className="w-full">{t("nav.register") || "無料登録"}</Button>
+                </Link>
+              </div>
             )}
           </div>
 
