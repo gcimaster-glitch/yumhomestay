@@ -74,52 +74,17 @@ export default function CookingSchoolDetail() {
     { enabled: !!schoolId }
   );
 
-  if (schoolLoading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="container py-16 max-w-5xl">
-          <div className="animate-pulse space-y-6">
-            <div className="h-64 bg-muted rounded-2xl" />
-            <div className="h-8 bg-muted rounded w-1/2" />
-            <div className="h-4 bg-muted rounded w-3/4" />
-            <div className="grid grid-cols-3 gap-4">
-              {[...Array(3)].map((_, i) => <div key={i} className="h-48 bg-muted rounded-xl" />)}
-            </div>
-          </div>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
-
-  if (!school) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="container py-32 text-center">
-          <ChefHat className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-          <h2 className="text-2xl font-bold mb-2">{t("cookingSchoolDetail.notFound")}</h2>
-          <Button onClick={() => navigate("/cooking-schools")} variant="outline" className="mt-4">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            {t("cookingSchoolDetail.backToList")}
-          </Button>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
-
+  // ─── SEO変数・エフェクト： Hooksルール上 early return より前に定義
   const isJa = i18n.language.startsWith("ja");
   const isZh = i18n.language.startsWith("zh");
-  const name = isJa ? school.nameJa : (school.nameEn ?? school.nameJa);
-  const description = isJa && school.descriptionJa ? school.descriptionJa : school.descriptionEn;
-  const languages: string[] = school.languages ? JSON.parse(school.languages) : [];
-  const certifications: string[] = school.certifications ? JSON.parse(school.certifications) : [];
-  const galleryImages: string[] = school.galleryImageUrls ? JSON.parse(school.galleryImageUrls) : [];
+  const name = isJa ? school?.nameJa : (school?.nameEn ?? school?.nameJa);
+  const description = isJa && school?.descriptionJa ? school?.descriptionJa : school?.descriptionEn;
+  const languages: string[] = school?.languages ? JSON.parse(school.languages) : [];
+  const certifications: string[] = school?.certifications ? JSON.parse(school.certifications) : [];
+  const galleryImages: string[] = school?.galleryImageUrls ? JSON.parse(school.galleryImageUrls) : [];
 
-  // ─── SEO: document.title + Course JSON-LD ─────────────────────────────────
   useEffect(() => {
+    if (!school) return;
     document.title = `${name ?? ""} | YumHomeStay`;
     const scriptId = "jsonld-cooking-school";
     let el = document.getElementById(scriptId) as HTMLScriptElement | null;
@@ -165,7 +130,43 @@ export default function CookingSchoolDetail() {
     }
     el.textContent = JSON.stringify(jsonLd);
     return () => { document.getElementById(scriptId)?.remove(); };
-  }, [name, description, galleryImages, school.id, school.profileImageUrl, school.prefecture, school.city, languages, ratingSummary]);
+  }, [school, name, description, galleryImages, ratingSummary]);
+
+  if (schoolLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="container py-16 max-w-5xl">
+          <div className="animate-pulse space-y-6">
+            <div className="h-64 bg-muted rounded-2xl" />
+            <div className="h-8 bg-muted rounded w-1/2" />
+            <div className="h-4 bg-muted rounded w-3/4" />
+            <div className="grid grid-cols-3 gap-4">
+              {[...Array(3)].map((_, i) => <div key={i} className="h-48 bg-muted rounded-xl" />)}
+            </div>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!school) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="container py-32 text-center">
+          <ChefHat className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+          <h2 className="text-2xl font-bold mb-2">{t("cookingSchoolDetail.notFound")}</h2>
+          <Button onClick={() => navigate("/cooking-schools")} variant="outline" className="mt-4">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            {t("cookingSchoolDetail.backToList")}
+          </Button>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

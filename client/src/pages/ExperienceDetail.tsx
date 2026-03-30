@@ -230,42 +230,14 @@ export default function ExperienceDetail() {
     });
   };
 
-  // ─── Loading / not found ───────────────────────────────────────────────────
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Navbar />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
-        </div>
-        <Footer />
-      </div>
-    );
-  }
-  if (!exp) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Navbar />
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-muted-foreground">{t("experience.notFound")}</p>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
-
-  const title = i18n.language.startsWith("ja") && exp.titleJa ? exp.titleJa : exp.titleEn;
-  const description = i18n.language.startsWith("ja") && exp.descriptionJa ? exp.descriptionJa : exp.descriptionEn;
-  const images = exp.imageUrls ? JSON.parse(exp.imageUrls) as string[] : [];
-
-  const daysInMonth = getDaysInMonth(calYear, calMonth);
-  const firstDay = getFirstDayOfMonth(calYear, calMonth);
-  const todayStr = today.toISOString().slice(0, 10);
-
-  const canBook = !!selectedDate && !!selectedSlotId && isAuthenticated;
-
   // ─── SEO: document.title + Event JSON-LD ──────────────────────────────────
+  // NOTE: useEffect は Hooks のルール上 early return より前に置く必要がある
+  const title = exp ? (i18n.language.startsWith("ja") && exp.titleJa ? exp.titleJa : exp.titleEn) : "";
+  const description = exp ? (i18n.language.startsWith("ja") && exp.descriptionJa ? exp.descriptionJa : exp.descriptionEn) : "";
+  const images = exp?.imageUrls ? JSON.parse(exp.imageUrls) as string[] : [];
+
   useEffect(() => {
+    if (!exp) return;
     document.title = `${title} | YumHomeStay`;
     const scriptId = "jsonld-experience";
     let el = document.getElementById(scriptId) as HTMLScriptElement | null;
@@ -309,7 +281,37 @@ export default function ExperienceDetail() {
     }
     el.textContent = JSON.stringify(jsonLd);
     return () => { document.getElementById(scriptId)?.remove(); };
-  }, [title, description, images, exp.id, ratingSummary]);
+  }, [exp, title, description, images, ratingSummary]);
+
+  // ─── Loading / not found ───────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+  if (!exp) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-muted-foreground">{t("experience.notFound")}</p>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  const daysInMonth = getDaysInMonth(calYear, calMonth);
+  const firstDay = getFirstDayOfMonth(calYear, calMonth);
+  const todayStr = today.toISOString().slice(0, 10);
+
+  const canBook = !!selectedDate && !!selectedSlotId && isAuthenticated;
 
   return (
     <div className="min-h-screen flex flex-col">
