@@ -16,6 +16,7 @@ export const en = {
     apply: "Apply",
     cookingSchoolDashboard: "Cooking School Dashboard",
     agentDashboard: "Agent Dashboard",
+    register: "Sign Up Free",
   },
   hero: {
     title: "Become Part of a Rural Japanese Family",

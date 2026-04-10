@@ -355,7 +355,7 @@ export default function ExperienceDetail() {
                 {exp.experienceType && <Badge variant="outline">{exp.experienceType}</Badge>}
                 <Badge variant="outline">
                   <Clock className="w-3 h-3 mr-1" />
-                  {exp.durationMinutes}{t("experience.minutes")}
+                  {t("experience.minutes", { count: exp.durationMinutes })}
                 </Badge>
                 <Badge variant="outline">
                   <Users className="w-3 h-3 mr-1" />

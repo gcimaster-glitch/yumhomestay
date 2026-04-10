@@ -16,6 +16,7 @@ export const ko = {
     apply: "신청하기",
     cookingSchoolDashboard: "요리 교실 대시보드",
     agentDashboard: "대리점 대시보드",
+    register: "무료 등록",
   },
   hero: {
     title: "일본 농촌 가족의 일원이 되어보세요",

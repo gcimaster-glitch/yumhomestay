@@ -16,6 +16,7 @@ export const zh = {
     apply: "申请",
     cookingSchoolDashboard: "烹饪学校控制台",
     agentDashboard: "代理控制台",
+    register: "免费注册",
   },
   hero: {
     title: "成为日本农村家庭的一员",

@@ -16,6 +16,7 @@ export const ja = {
     apply: "申し込む",
     cookingSchoolDashboard: "料理教室ダッシュボード",
     agentDashboard: "代理店ダッシュボード",
+    register: "無料登録",
   },
   hero: {
     title: "日本の農村家族の一員になろう",
