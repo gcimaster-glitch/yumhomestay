@@ -16,6 +16,7 @@ import { TrendBadge } from "@/components/TrendBadge";
 import { BookingChat } from "@/components/BookingChat";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "wouter";
 
@@ -2066,17 +2067,41 @@ function AdminKycTab() {
 function AdminErrorMonitorTab() {
   const { user, isAuthenticated } = useAuth();
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "resolved" | "ignored">("open");
+  const [severityFilter, setSeverityFilter] = useState<"all" | "critical" | "high" | "medium" | "low">("all");
   const [selectedErrorId, setSelectedErrorId] = useState<number | null>(null);
   const [resolveNote, setResolveNote] = useState("");
   const [showResolveDialog, setShowResolveDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState<"list" | "chart" | "surge" | "recurrence">("list");
+
+  const isAdmin = isAuthenticated && user?.role === "admin";
 
   const { data: errors, refetch } = trpc.errorMonitor.list.useQuery(
-    { status: statusFilter === "all" ? undefined : statusFilter, limit: 100 },
-    { enabled: isAuthenticated && user?.role === "admin", refetchInterval: 30000 }
+    {
+      status: statusFilter === "all" ? undefined : statusFilter,
+      severity: severityFilter === "all" ? undefined : severityFilter,
+      limit: 100,
+    },
+    { enabled: isAdmin, refetchInterval: 30000 }
   );
   const { data: summary } = trpc.errorMonitor.summary.useQuery(
     undefined,
-    { enabled: isAuthenticated && user?.role === "admin", refetchInterval: 60000 }
+    { enabled: isAdmin, refetchInterval: 60000 }
+  );
+  const { data: timeSeries } = trpc.errorMonitor.timeSeries.useQuery(
+    { days: 7 },
+    { enabled: isAdmin && activeTab === "chart", refetchInterval: 120000 }
+  );
+  const { data: surgeList } = trpc.errorMonitor.surgeList.useQuery(
+    undefined,
+    { enabled: isAdmin, refetchInterval: 60000 }
+  );
+  const { data: recurrenceList } = trpc.errorMonitor.recurrenceList.useQuery(
+    undefined,
+    { enabled: isAdmin && activeTab === "recurrence", refetchInterval: 60000 }
+  );
+  const { data: categoryStats } = trpc.errorMonitor.categoryStats.useQuery(
+    undefined,
+    { enabled: isAdmin && activeTab === "chart", refetchInterval: 120000 }
   );
 
   const resolve = trpc.errorMonitor.resolve.useMutation({
@@ -2094,10 +2119,23 @@ function AdminErrorMonitorTab() {
     onError: (err: { message: string }) => toast.error(err.message),
   });
 
+  const severityColors: Record<string, string> = {
+    critical: "bg-red-100 text-red-800 border-red-300",
+    high: "bg-orange-100 text-orange-800 border-orange-300",
+    medium: "bg-yellow-100 text-yellow-800 border-yellow-300",
+    low: "bg-gray-100 text-gray-600 border-gray-300",
+  };
+  const severityBarColors: Record<string, string> = {
+    critical: "#dc2626",
+    high: "#ea580c",
+    medium: "#ca8a04",
+    low: "#6b7280",
+  };
   const statusColors: Record<string, string> = {
     open: "bg-red-100 text-red-700 border-red-200",
     resolved: "bg-green-100 text-green-700 border-green-200",
     ignored: "bg-gray-100 text-gray-500 border-gray-200",
+    investigating: "bg-blue-100 text-blue-700 border-blue-200",
   };
   const sourceColors: Record<string, string> = {
     frontend: "bg-blue-100 text-blue-700",
@@ -2105,8 +2143,41 @@ function AdminErrorMonitorTab() {
     api: "bg-purple-100 text-purple-700",
   };
 
+  // contextからfixSuggestionとcategoryとaiEnhancedを取得するヘルパー
+  const parseContext = (context: string | null) => {
+    if (!context) return { fixSuggestion: null, category: null, aiEnhanced: false };
+    try {
+      const parsed = JSON.parse(context);
+      return {
+        fixSuggestion: parsed.fixSuggestion ?? null,
+        category: parsed.category ?? null,
+        aiEnhanced: parsed.aiEnhanced ?? false,
+      };
+    } catch {
+      return { fixSuggestion: null, category: null, aiEnhanced: false };
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* 急増アラートバナー */}
+      {surgeList && surgeList.length > 0 && (
+        <div className="bg-red-50 border border-red-300 rounded-lg p-4 flex items-start gap-3">
+          <AlertTriangle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+          <div>
+            <p className="font-semibold text-red-800 text-sm">📈 急増エラーを検知しました</p>
+            <p className="text-xs text-red-700 mt-1">
+              直近10分間で以下のエラーが急増しています：
+              {surgeList.map((s) => (
+                <span key={s.errorType} className="ml-2 font-mono bg-red-100 px-1 rounded">
+                  {s.errorType}（{s.count}件）
+                </span>
+              ))}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* サマリーカード */}
       {summary && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -2124,22 +2195,22 @@ function AdminErrorMonitorTab() {
               <AlertTriangle className="text-orange-500 flex-shrink-0" size={24} />
               <div>
                 <p className="text-2xl font-bold text-orange-700">{summary.critical}</p>
-                <p className="text-xs text-orange-600">クリティカル（5回以上）</p>
+                <p className="text-xs text-orange-600">クリティカル</p>
               </div>
             </CardContent>
           </Card>
-          <Card className="border-green-200 bg-green-50">
+          <Card className="border-blue-200 bg-blue-50">
             <CardContent className="p-4 flex items-center gap-3">
-              <CheckCircle className="text-green-500 flex-shrink-0" size={24} />
+              <RefreshCw className="text-blue-500 flex-shrink-0" size={24} />
               <div>
-                <p className="text-2xl font-bold text-green-700">{summary.total - summary.open}</p>
-                <p className="text-xs text-green-600">解決済み</p>
+                <p className="text-2xl font-bold text-blue-700">{summary.last24h}</p>
+                <p className="text-xs text-blue-600">直近24時間</p>
               </div>
             </CardContent>
           </Card>
           <Card className="border-border">
             <CardContent className="p-4 flex items-center gap-3">
-              <RefreshCw className="text-muted-foreground flex-shrink-0" size={24} />
+              <CheckCircle className="text-muted-foreground flex-shrink-0" size={24} />
               <div>
                 <p className="text-2xl font-bold">{summary.total}</p>
                 <p className="text-xs text-muted-foreground">総エラー数</p>
@@ -2149,18 +2220,22 @@ function AdminErrorMonitorTab() {
         </div>
       )}
 
-      {/* フィルター */}
-      <div className="flex gap-2 flex-wrap items-center">
-        <span className="text-sm text-muted-foreground font-medium">ステータス:</span>
-        {(["open", "all", "resolved", "ignored"] as const).map((s) => (
+      {/* タブ切り替え */}
+      <div className="flex gap-2 flex-wrap border-b pb-2">
+        {([
+          { key: "list", label: "エラー一覧" },
+          { key: "chart", label: "📊 時系列グラフ" },
+          { key: "surge", label: `📈 急増 ${surgeList && surgeList.length > 0 ? `(${surgeList.length})` : ""}` },
+          { key: "recurrence", label: "🔄 循環エラー" },
+        ] as const).map((tab) => (
           <Button
-            key={s}
+            key={tab.key}
             size="sm"
-            variant={statusFilter === s ? "default" : "outline"}
-            onClick={() => setStatusFilter(s)}
+            variant={activeTab === tab.key ? "default" : "ghost"}
+            onClick={() => setActiveTab(tab.key)}
             className="text-xs"
           >
-            {s === "open" ? "未解決" : s === "resolved" ? "解決済み" : s === "ignored" ? "無視" : "すべて"}
+            {tab.label}
           </Button>
         ))}
         <Button size="sm" variant="ghost" onClick={() => refetch()} className="ml-auto text-xs gap-1">
@@ -2168,73 +2243,295 @@ function AdminErrorMonitorTab() {
         </Button>
       </div>
 
-      {/* エラー一覧 */}
-      {!errors || errors.length === 0 ? (
-        <div className="text-center py-16">
-          <CheckCircle size={48} className="text-green-400 mx-auto mb-4" />
-          <p className="text-muted-foreground font-medium">エラーはありません</p>
-          <p className="text-xs text-muted-foreground mt-1">システムは正常に動作しています</p>
+      {/* エラー一覧タブ */}
+      {activeTab === "list" && (
+        <div className="space-y-4">
+          {/* フィルター */}
+          <div className="flex gap-2 flex-wrap items-center">
+            <span className="text-xs text-muted-foreground font-medium">ステータス:</span>
+            {(["open", "all", "resolved", "ignored"] as const).map((s) => (
+              <Button key={s} size="sm" variant={statusFilter === s ? "default" : "outline"} onClick={() => setStatusFilter(s)} className="text-xs h-7">
+                {s === "open" ? "未解決" : s === "resolved" ? "解決済み" : s === "ignored" ? "無視" : "すべて"}
+              </Button>
+            ))}
+            <span className="text-xs text-muted-foreground font-medium ml-2">重要度:</span>
+            {(["all", "critical", "high", "medium", "low"] as const).map((sv) => (
+              <Button key={sv} size="sm" variant={severityFilter === sv ? "default" : "outline"} onClick={() => setSeverityFilter(sv)} className={`text-xs h-7 ${sv !== "all" ? severityColors[sv] : ""}`}>
+                {sv === "all" ? "すべて" : sv}
+              </Button>
+            ))}
+          </div>
+
+          {/* エラー一覧 */}
+          {!errors || errors.length === 0 ? (
+            <div className="text-center py-16">
+              <CheckCircle size={48} className="text-green-400 mx-auto mb-4" />
+              <p className="text-muted-foreground font-medium">エラーはありません</p>
+              <p className="text-xs text-muted-foreground mt-1">システムは正常に動作しています</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {errors.map((err) => {
+                const ctx = parseContext(err.context);
+                const isRecurrence = err.status === "open" && err.resolvedAt != null;
+                return (
+                  <Card key={err.id} className={`border ${
+                    isRecurrence ? "border-purple-300 bg-purple-50/30" :
+                    err.severity === "critical" ? "border-red-300 bg-red-50/20" :
+                    err.occurrenceCount >= 5 ? "border-orange-300 bg-orange-50/20" :
+                    "border-border"
+                  }`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <Badge className={`text-xs border ${statusColors[err.status] ?? ""}`}>
+                              {err.status === "open" ? "未解決" : err.status === "resolved" ? "解決済み" : err.status === "investigating" ? "調査中" : "無視"}
+                            </Badge>
+                            <Badge className={`text-xs border ${severityColors[err.severity] ?? ""}`}>
+                              {err.severity}
+                            </Badge>
+                            <Badge className={`text-xs ${sourceColors[err.source] ?? "bg-gray-100 text-gray-700"}`}>
+                              {err.source}
+                            </Badge>
+                            {ctx.category && (
+                              <Badge className="text-xs bg-indigo-100 text-indigo-700">
+                                {ctx.category}
+                              </Badge>
+                            )}
+                            {isRecurrence && (
+                              <Badge className="text-xs bg-purple-600 text-white">
+                                🔄 循環エラー
+                              </Badge>
+                            )}
+                            {err.occurrenceCount >= 5 && (
+                              <Badge className="text-xs bg-red-600 text-white">
+                                🔥 {err.occurrenceCount}回発生
+                              </Badge>
+                            )}
+                            {err.occurrenceCount < 5 && err.occurrenceCount > 1 && (
+                              <span className="text-xs text-muted-foreground">{err.occurrenceCount}回</span>
+                            )}
+                            {ctx.aiEnhanced && (
+                              <Badge className="text-xs bg-gradient-to-r from-violet-500 to-purple-600 text-white">
+                                ✨ AI分析済み
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="font-medium text-sm text-foreground truncate">{err.errorType}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{err.message}</p>
+                          {err.url && (
+                            <p className="text-xs text-blue-600 mt-0.5 truncate">{err.url}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            最終発生: {new Date(err.updatedAt).toLocaleString("ja-JP")}
+                            {err.resolvedAt && ` · 解決: ${new Date(err.resolvedAt).toLocaleString("ja-JP")}`}
+                          </p>
+                          {ctx.fixSuggestion && (
+                            <div className={`text-xs rounded p-2 mt-2 ${ctx.aiEnhanced ? "bg-violet-50 text-violet-800 border border-violet-200" : "bg-blue-50 text-blue-800 border border-blue-200"}`}>
+                              <span className="font-semibold">{ctx.aiEnhanced ? "✨ AI修正提案: " : "💡 修正提案: "}</span>
+                              {ctx.fixSuggestion}
+                            </div>
+                          )}
+                          {err.resolvedNote && (
+                            <p className="text-xs bg-green-50 text-green-700 rounded p-2 mt-2 border border-green-200">
+                              ✅ 解決メモ: {err.resolvedNote}
+                            </p>
+                          )}
+                        </div>
+                        {err.status === "open" && (
+                          <div className="flex gap-2 flex-shrink-0">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs gap-1 text-green-700 border-green-300 hover:bg-green-50"
+                              onClick={() => { setSelectedErrorId(err.id); setShowResolveDialog(true); }}
+                            >
+                              <CheckCircle size={12} /> 解決済み
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-xs text-muted-foreground"
+                              onClick={() => ignore.mutate({ id: err.id })}
+                            >
+                              <XCircle size={12} />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="space-y-3">
-          {errors.map((err) => (
-            <Card key={err.id} className={`border ${err.occurrenceCount >= 5 ? "border-red-300 bg-red-50/30" : "border-border"}`}>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <Badge className={`text-xs border ${statusColors[err.status] ?? ""}`}>
-                        {err.status === "open" ? "未解決" : err.status === "resolved" ? "解決済み" : "無視"}
-                      </Badge>
-                      <Badge className={`text-xs ${sourceColors[err.source] ?? "bg-gray-100 text-gray-700"}`}>
-                        {err.source}
-                      </Badge>
-                      {err.occurrenceCount >= 5 && (
-                        <Badge className="text-xs bg-red-600 text-white">
-                          🔥 {err.occurrenceCount}回発生
-                        </Badge>
-                      )}
-                      {err.occurrenceCount < 5 && err.occurrenceCount > 1 && (
-                        <span className="text-xs text-muted-foreground">{err.occurrenceCount}回</span>
-                      )}
-                    </div>
-                    <p className="font-medium text-sm text-foreground truncate">{err.errorType}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{err.message}</p>
-                    {err.url && (
-                      <p className="text-xs text-blue-600 mt-0.5 truncate">{err.url}</p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      最終発生: {new Date(err.updatedAt).toLocaleString("ja-JP")}
-                      {err.resolvedAt && ` · 解決: ${new Date(err.resolvedAt).toLocaleString("ja-JP")}`}
-                    </p>
-                    {err.resolveNote && (
-                      <p className="text-xs bg-green-50 text-green-700 rounded p-2 mt-2">解決メモ: {err.resolveNote}</p>
-                    )}
-                  </div>
-                  {err.status === "open" && (
-                    <div className="flex gap-2 flex-shrink-0">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-xs gap-1 text-green-700 border-green-300 hover:bg-green-50"
-                        onClick={() => { setSelectedErrorId(err.id); setShowResolveDialog(true); }}
-                      >
-                        <CheckCircle size={12} /> 解決済みにする
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-xs text-muted-foreground"
-                        onClick={() => ignore.mutate({ id: err.id })}
-                      >
-                        <XCircle size={12} />
-                      </Button>
-                    </div>
-                  )}
+      )}
+
+      {/* 時系列グラフタブ */}
+      {activeTab === "chart" && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">直近7日間のエラー推移（重要度別）</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!timeSeries || timeSeries.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground text-sm">データがありません</div>
+              ) : (
+                <div className="w-full overflow-x-auto">
+                  <BarChart width={600} height={280} data={timeSeries} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip
+                      formatter={(value: number, name: string) => [value + "件", name]}
+                      labelFormatter={(label: string) => `日付: ${label}`}
+                    />
+                    <Legend />
+                    <Bar dataKey="critical" name="critical" stackId="a" fill={severityBarColors.critical} />
+                    <Bar dataKey="high" name="high" stackId="a" fill={severityBarColors.high} />
+                    <Bar dataKey="medium" name="medium" stackId="a" fill={severityBarColors.medium} />
+                    <Bar dataKey="low" name="low" stackId="a" fill={severityBarColors.low} />
+                  </BarChart>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+              )}
+            </CardContent>
+          </Card>
+
+          {/* カテゴリ別集計 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">未解決エラー — 種別別集計（発生回数順）</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!categoryStats || categoryStats.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">未解決エラーはありません</div>
+              ) : (
+                <div className="space-y-2">
+                  {categoryStats.map((stat, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-medium truncate">{stat.errorType}</span>
+                          <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
+                            {stat.totalOccurrences}回 / {stat.uniqueErrors}種
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-100 rounded-full h-2">
+                          <div
+                            className="h-2 rounded-full"
+                            style={{
+                              width: `${Math.min(100, (stat.totalOccurrences / (categoryStats[0]?.totalOccurrences ?? 1)) * 100)}%`,
+                              backgroundColor: severityBarColors[stat.severity] ?? "#6b7280",
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <Badge className={`text-xs border flex-shrink-0 ${severityColors[stat.severity] ?? ""}`}>
+                        {stat.severity}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* 急増エラータブ */}
+      {activeTab === "surge" && (
+        <div className="space-y-3">
+          {!surgeList || surgeList.length === 0 ? (
+            <div className="text-center py-16">
+              <CheckCircle size={48} className="text-green-400 mx-auto mb-4" />
+              <p className="text-muted-foreground font-medium">急増エラーはありません</p>
+              <p className="text-xs text-muted-foreground mt-1">直近10分間で3件以上の同種エラーが発生した場合に表示されます</p>
+            </div>
+          ) : (
+            surgeList.map((surge, i) => (
+              <Card key={i} className="border-red-300 bg-red-50/30">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge className={`text-xs border ${severityColors[surge.severity] ?? ""}`}>{surge.severity}</Badge>
+                        <Badge className="text-xs bg-red-600 text-white">📈 {surge.count}件/10分</Badge>
+                      </div>
+                      <p className="font-medium text-sm">{surge.errorType}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{surge.latestMessage}</p>
+                      {surge.latestUrl && <p className="text-xs text-blue-600 mt-0.5 truncate">{surge.latestUrl}</p>}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* 循環エラータブ */}
+      {activeTab === "recurrence" && (
+        <div className="space-y-3">
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-xs text-purple-800">
+            🔄 <strong>循環エラー</strong>とは、一度「解決済み」にしたにもかかわらず、24時間以内に再発したエラーです。根本原因が解決されていない可能性があります。
+          </div>
+          {!recurrenceList || recurrenceList.length === 0 ? (
+            <div className="text-center py-16">
+              <CheckCircle size={48} className="text-green-400 mx-auto mb-4" />
+              <p className="text-muted-foreground font-medium">循環エラーはありません</p>
+              <p className="text-xs text-muted-foreground mt-1">解決済みにしたエラーが24時間以内に再発した場合に表示されます</p>
+            </div>
+          ) : (
+            recurrenceList.map((err) => {
+              const ctx = parseContext(err.context);
+              return (
+                <Card key={err.id} className="border-purple-300 bg-purple-50/30">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <Badge className="text-xs bg-purple-600 text-white">🔄 循環エラー</Badge>
+                          <Badge className={`text-xs border ${severityColors[err.severity] ?? ""}`}>{err.severity}</Badge>
+                          {ctx.category && <Badge className="text-xs bg-indigo-100 text-indigo-700">{ctx.category}</Badge>}
+                        </div>
+                        <p className="font-medium text-sm">{err.errorType}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{err.message}</p>
+                        {err.url && <p className="text-xs text-blue-600 mt-0.5 truncate">{err.url}</p>}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          解決済みにした日時: {err.resolvedAt ? new Date(err.resolvedAt).toLocaleString("ja-JP") : "不明"}
+                          {" · "}再発: {new Date(err.updatedAt).toLocaleString("ja-JP")}
+                        </p>
+                        {err.resolvedNote && (
+                          <p className="text-xs bg-purple-100 text-purple-800 rounded p-2 mt-2 border border-purple-200">
+                            前回の解決メモ: {err.resolvedNote}
+                          </p>
+                        )}
+                        {ctx.fixSuggestion && (
+                          <div className="text-xs bg-blue-50 text-blue-800 rounded p-2 mt-2 border border-blue-200">
+                            <span className="font-semibold">💡 修正提案: </span>{ctx.fixSuggestion}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs gap-1 text-green-700 border-green-300 hover:bg-green-50"
+                          onClick={() => { setSelectedErrorId(err.id); setShowResolveDialog(true); }}
+                        >
+                          <CheckCircle size={12} /> 再解決
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
         </div>
       )}
 
