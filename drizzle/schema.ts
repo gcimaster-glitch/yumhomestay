@@ -720,3 +720,27 @@ export const apiKeys = mysqlTable("apiKeys", {
 });
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type InsertApiKey = typeof apiKeys.$inferInsert;
+
+// ─── 循環型エラー発見システム: エラーログ ────────────────────────────────────────
+// フロントエンド・バックエンド双方のエラーを収集・分析・アラートするためのテーブル
+export const errorLogs = mysqlTable("errorLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  errorType: varchar("errorType", { length: 200 }).notNull(),  // エラーの種類（例: "TypeError", "NetworkError"）
+  message: text("message").notNull(),                          // エラーメッセージ
+  stack: text("stack"),                                        // スタックトレース
+  url: varchar("url", { length: 2048 }),                       // 発生したURL
+  userId: int("userId"),                                       // 発生したユーザーID（null=未ログイン）
+  userAgent: text("userAgent"),                                // ブラウザ/クライアント情報
+  ipAddress: varchar("ipAddress", { length: 45 }),             // IPアドレス
+  context: text("context"),                                    // 追加コンテキスト（JSON）
+  severity: mysqlEnum("severity", ["low", "medium", "high", "critical"]).notNull().default("medium"),
+  source: mysqlEnum("source", ["frontend", "backend", "api"]).notNull().default("frontend"),
+  status: mysqlEnum("status", ["open", "investigating", "resolved", "ignored"]).notNull().default("open"),
+  occurrenceCount: int("occurrenceCount").notNull().default(1), // 同一エラーの発生回数
+  resolvedNote: text("resolvedNote"),                          // 解決時のメモ
+  resolvedAt: timestamp("resolvedAt"),                         // 解決日時
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type ErrorLog = typeof errorLogs.$inferSelect;
+export type InsertErrorLog = typeof errorLogs.$inferInsert;

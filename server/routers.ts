@@ -21,6 +21,7 @@ import { contactRouter } from "./routers/contact";
 import { kycRouter } from "./routers/kyc";
 import { authRouter } from "./routers/auth";
 import { apiKeyRouter } from "./routers/apiKey";
+import { errorMonitorRouter } from "./routers/errorMonitor";
 
 export const appRouter = router({
   system: systemRouter,
@@ -58,6 +59,7 @@ export const appRouter = router({
   contact: contactRouter,
   kyc: kycRouter,
   apiKey: apiKeyRouter,
+  errorMonitor: errorMonitorRouter,
 });
 
 export type AppRouter = typeof appRouter;

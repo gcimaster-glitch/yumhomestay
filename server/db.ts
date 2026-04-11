@@ -37,6 +37,8 @@ import {
   kycSubmissions,
   type KycSubmission,
   type InsertKycSubmission,
+  apiKeys,
+  errorLogs,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -1273,4 +1275,110 @@ export async function getKycSubmissionByStripeSessionId(sessionId: string): Prom
     .where(eq(kycSubmissions.stripeVerificationSessionId, sessionId))
     .limit(1);
   return result[0];
+}
+
+// ─── GDPR: ユーザー退会・個人情報匿名化 ─────────────────────────────────────────
+/**
+ * ユーザーの個人情報を完全に匿名化する（GDPR「忘れられる権利」対応）
+ * 予約・支払い履歴等の統計データは保持するが、個人を特定できる情報は全て消去する
+ */
+export async function anonymizeUser(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const anonymizedEmail = `deleted_${userId}_${Date.now()}@anonymized.yumhomestay.com`;
+  const anonymizedName = `削除済みユーザー #${userId}`;
+  await db.update(users).set({
+    name: anonymizedName,
+    email: anonymizedEmail,
+    passwordHash: null,
+    googleId: null,
+    lineId: null,
+    avatarUrl: null,
+    passportInfoEncrypted: null,
+    emergencyContactEncrypted: null,
+    mfaSecret: null,
+    mfaEnabled: false,
+    deletedAt: new Date(),
+  }).where(eq(users.id, userId));
+}
+
+// ─── エラーログ（循環型エラー発見システム） ────────────────────────────────────────
+export async function createErrorLog(data: {
+  errorType: string;
+  message: string;
+  stack?: string;
+  url?: string;
+  userId?: number;
+  userAgent?: string;
+  ipAddress?: string;
+  context?: string;
+  severity: "low" | "medium" | "high" | "critical";
+  source: "frontend" | "backend" | "api";
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db.insert(errorLogs).values({
+    ...data,
+    status: "open",
+    occurrenceCount: 1,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  // 同一エラーの発生回数を集計して既存レコードを更新（重複排除）
+  return (result as { insertId: number }).insertId ?? 0;
+}
+
+export async function getErrorLogs(filters?: {
+  status?: "open" | "investigating" | "resolved" | "ignored";
+  severity?: "low" | "medium" | "high" | "critical";
+  source?: "frontend" | "backend" | "api";
+  limit?: number;
+  offset?: number;
+}) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (filters?.status) conditions.push(eq(errorLogs.status, filters.status));
+  if (filters?.severity) conditions.push(eq(errorLogs.severity, filters.severity));
+  if (filters?.source) conditions.push(eq(errorLogs.source, filters.source));
+  return db
+    .select()
+    .from(errorLogs)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .limit(filters?.limit ?? 100)
+    .offset(filters?.offset ?? 0)
+    .orderBy(desc(errorLogs.createdAt));
+}
+
+export async function updateErrorLogStatus(
+  id: number,
+  status: "open" | "investigating" | "resolved" | "ignored",
+  resolvedNote?: string
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(errorLogs).set({
+    status,
+    resolvedNote: resolvedNote ?? null,
+    resolvedAt: status === "resolved" ? new Date() : null,
+    updatedAt: new Date(),
+  }).where(eq(errorLogs.id, id));
+}
+
+export async function getErrorLogStats() {
+  const db = await getDb();
+  if (!db) return { total: 0, open: 0, critical: 0, last24h: 0 };
+  const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const [totalRows, openRows, criticalRows, recentRows] = await Promise.all([
+    db.select({ count: sql<number>`count(*)` }).from(errorLogs),
+    db.select({ count: sql<number>`count(*)` }).from(errorLogs).where(eq(errorLogs.status, "open")),
+    db.select({ count: sql<number>`count(*)` }).from(errorLogs).where(eq(errorLogs.severity, "critical")),
+    db.select({ count: sql<number>`count(*)` }).from(errorLogs).where(gte(errorLogs.createdAt, since24h)),
+  ]);
+  return {
+    total: Number(totalRows[0]?.count ?? 0),
+    open: Number(openRows[0]?.count ?? 0),
+    critical: Number(criticalRows[0]?.count ?? 0),
+    last24h: Number(recentRows[0]?.count ?? 0),
+  };
 }

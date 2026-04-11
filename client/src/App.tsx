@@ -9,6 +9,7 @@ import { useAuth } from "./_core/hooks/useAuth";
 import TermsAgreementModal from "./components/TermsAgreementModal";
 import OnboardingModal, { useOnboarding } from "./components/OnboardingModal";
 import { trpc } from "@/lib/trpc";
+import { useGlobalErrorCatcher } from "./hooks/useGlobalErrorCatcher";
 
 // ─── Eager-loaded pages (critical path: LCP / first-paint) ───────────────────
 // Home・Experiences・CookingSchools は初回アクセスで最も多く使われるため即時ロード
@@ -75,6 +76,12 @@ function PageLoader() {
       <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
     </div>
   );
+}
+
+// 循環型エラー発見システム — グローバルエラーキャッチャーを全ページで有効化
+function GlobalErrorWatcher() {
+  useGlobalErrorCatcher();
+  return null;
 }
 
 function ScrollToTop() {
@@ -225,6 +232,7 @@ function TermsGuard({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <ErrorBoundary>
+      <GlobalErrorWatcher />
       <ScrollToTop />
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>

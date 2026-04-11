@@ -1229,3 +1229,26 @@ export async function sendRegistrationVerificationEmail(params: {
     </div>`;
   return sendEmail({ to, subject, html: baseTemplate(body, "ja") });
 }
+
+// ─── 管理者アラートメール（循環型エラー発見システム用） ──────────────────────────
+export async function sendAdminAlertEmail(params: {
+  subject: string;
+  body: string;
+}): Promise<boolean> {
+  const { subject, body } = params;
+  const adminEmail = process.env.ADMIN_ALERT_EMAIL ?? process.env.RESEND_FROM_EMAIL ?? "";
+  if (!adminEmail) return false;
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+      <div style="background:#dc2626;color:#fff;padding:16px 24px;border-radius:8px 8px 0 0;">
+        <h2 style="margin:0;font-size:18px;">&#9888;&#65039; YumHomeStay システムアラート</h2>
+      </div>
+      <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px;">
+        <pre style="white-space:pre-wrap;font-family:monospace;font-size:13px;color:#374151;background:#f9fafb;padding:16px;border-radius:6px;">${body}</pre>
+        <p style="margin-top:24px;font-size:13px;color:#6b7280;">
+          このメールはYumHomeStayの循環型エラー発見システムから自動送信されています。
+        </p>
+      </div>
+    </div>`;
+  return sendEmail({ to: adminEmail, subject, html });
+}

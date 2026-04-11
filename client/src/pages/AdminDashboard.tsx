@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { BookOpen, Calendar, ChefHat, ClipboardList, DollarSign, ExternalLink, MapPin, MessageCircle, Phone, School, Shield, Users, UserPlus, Download, Reply, Trash2, StickyNote } from "lucide-react";
+import { BookOpen, Calendar, ChefHat, ClipboardList, DollarSign, ExternalLink, MapPin, MessageCircle, Phone, School, Shield, Users, UserPlus, Download, Reply, Trash2, StickyNote, AlertTriangle, CheckCircle, XCircle, RefreshCw } from "lucide-react";
 import { TrendBadge } from "@/components/TrendBadge";
 import { BookingChat } from "@/components/BookingChat";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -442,6 +442,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="kyc" className="flex items-center gap-1">
               <Shield className="w-3.5 h-3.5" />
               KYC審査
+            </TabsTrigger>
+            <TabsTrigger value="error-monitor" className="flex items-center gap-1 text-destructive data-[state=active]:text-destructive">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              エラー監視
             </TabsTrigger>
           </TabsList>
 
@@ -1133,6 +1137,10 @@ export default function AdminDashboard() {
           {/* ─── KYC tab ─────────────────────────────────────────── */}
           <TabsContent value="kyc" className="mt-4">
             <AdminKycTab />
+          </TabsContent>
+          {/* ─── Error Monitor tab ─────────────────────────────────────────── */}
+          <TabsContent value="error-monitor" className="mt-4">
+            <AdminErrorMonitorTab />
           </TabsContent>
         </Tabs>
       </div>
@@ -1862,6 +1870,214 @@ function AdminKycTab() {
             <Button variant="outline" onClick={() => setShowRejectDialog(false)}>キャンセル</Button>
             <Button variant="destructive" onClick={() => { if (selectedId) { const sub = submissions?.find((x) => x.id === selectedId); if (sub) review.mutate({ submissionId: selectedId, userId: sub.userId, decision: "rejected", reviewNote: rejectNote }); } setShowRejectDialog(false); }}>
               却下する
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ─── 循環型エラー発見システム — 管理画面ダッシュボード ─────────────────────────────────
+function AdminErrorMonitorTab() {
+  const { user, isAuthenticated } = useAuth();
+  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "resolved" | "ignored">("open");
+  const [selectedErrorId, setSelectedErrorId] = useState<number | null>(null);
+  const [resolveNote, setResolveNote] = useState("");
+  const [showResolveDialog, setShowResolveDialog] = useState(false);
+
+  const { data: errors, refetch } = trpc.errorMonitor.list.useQuery(
+    { status: statusFilter === "all" ? undefined : statusFilter, limit: 100 },
+    { enabled: isAuthenticated && user?.role === "admin", refetchInterval: 30000 }
+  );
+  const { data: summary } = trpc.errorMonitor.summary.useQuery(
+    undefined,
+    { enabled: isAuthenticated && user?.role === "admin", refetchInterval: 60000 }
+  );
+
+  const resolve = trpc.errorMonitor.resolve.useMutation({
+    onSuccess: () => {
+      toast.success("エラーを解決済みにしました");
+      setShowResolveDialog(false);
+      setSelectedErrorId(null);
+      setResolveNote("");
+      refetch();
+    },
+    onError: (err: { message: string }) => toast.error(err.message),
+  });
+  const ignore = trpc.errorMonitor.ignore.useMutation({
+    onSuccess: () => { toast.success("エラーを無視しました"); refetch(); },
+    onError: (err: { message: string }) => toast.error(err.message),
+  });
+
+  const statusColors: Record<string, string> = {
+    open: "bg-red-100 text-red-700 border-red-200",
+    resolved: "bg-green-100 text-green-700 border-green-200",
+    ignored: "bg-gray-100 text-gray-500 border-gray-200",
+  };
+  const sourceColors: Record<string, string> = {
+    frontend: "bg-blue-100 text-blue-700",
+    backend: "bg-orange-100 text-orange-700",
+    api: "bg-purple-100 text-purple-700",
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* サマリーカード */}
+      {summary && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-4 flex items-center gap-3">
+              <XCircle className="text-red-500 flex-shrink-0" size={24} />
+              <div>
+                <p className="text-2xl font-bold text-red-700">{summary.open}</p>
+                <p className="text-xs text-red-600">未解決エラー</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-orange-200 bg-orange-50">
+            <CardContent className="p-4 flex items-center gap-3">
+              <AlertTriangle className="text-orange-500 flex-shrink-0" size={24} />
+              <div>
+                <p className="text-2xl font-bold text-orange-700">{summary.critical}</p>
+                <p className="text-xs text-orange-600">クリティカル（5回以上）</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-green-200 bg-green-50">
+            <CardContent className="p-4 flex items-center gap-3">
+              <CheckCircle className="text-green-500 flex-shrink-0" size={24} />
+              <div>
+                <p className="text-2xl font-bold text-green-700">{summary.total - summary.open}</p>
+                <p className="text-xs text-green-600">解決済み</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border">
+            <CardContent className="p-4 flex items-center gap-3">
+              <RefreshCw className="text-muted-foreground flex-shrink-0" size={24} />
+              <div>
+                <p className="text-2xl font-bold">{summary.total}</p>
+                <p className="text-xs text-muted-foreground">総エラー数</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* フィルター */}
+      <div className="flex gap-2 flex-wrap items-center">
+        <span className="text-sm text-muted-foreground font-medium">ステータス:</span>
+        {(["open", "all", "resolved", "ignored"] as const).map((s) => (
+          <Button
+            key={s}
+            size="sm"
+            variant={statusFilter === s ? "default" : "outline"}
+            onClick={() => setStatusFilter(s)}
+            className="text-xs"
+          >
+            {s === "open" ? "未解決" : s === "resolved" ? "解決済み" : s === "ignored" ? "無視" : "すべて"}
+          </Button>
+        ))}
+        <Button size="sm" variant="ghost" onClick={() => refetch()} className="ml-auto text-xs gap-1">
+          <RefreshCw size={12} /> 更新
+        </Button>
+      </div>
+
+      {/* エラー一覧 */}
+      {!errors || errors.length === 0 ? (
+        <div className="text-center py-16">
+          <CheckCircle size={48} className="text-green-400 mx-auto mb-4" />
+          <p className="text-muted-foreground font-medium">エラーはありません</p>
+          <p className="text-xs text-muted-foreground mt-1">システムは正常に動作しています</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {errors.map((err) => (
+            <Card key={err.id} className={`border ${err.occurrenceCount >= 5 ? "border-red-300 bg-red-50/30" : "border-border"}`}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <Badge className={`text-xs border ${statusColors[err.status] ?? ""}`}>
+                        {err.status === "open" ? "未解決" : err.status === "resolved" ? "解決済み" : "無視"}
+                      </Badge>
+                      <Badge className={`text-xs ${sourceColors[err.source] ?? "bg-gray-100 text-gray-700"}`}>
+                        {err.source}
+                      </Badge>
+                      {err.occurrenceCount >= 5 && (
+                        <Badge className="text-xs bg-red-600 text-white">
+                          🔥 {err.occurrenceCount}回発生
+                        </Badge>
+                      )}
+                      {err.occurrenceCount < 5 && err.occurrenceCount > 1 && (
+                        <span className="text-xs text-muted-foreground">{err.occurrenceCount}回</span>
+                      )}
+                    </div>
+                    <p className="font-medium text-sm text-foreground truncate">{err.errorType}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{err.message}</p>
+                    {err.url && (
+                      <p className="text-xs text-blue-600 mt-0.5 truncate">{err.url}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      最終発生: {new Date(err.updatedAt).toLocaleString("ja-JP")}
+                      {err.resolvedAt && ` · 解決: ${new Date(err.resolvedAt).toLocaleString("ja-JP")}`}
+                    </p>
+                    {err.resolveNote && (
+                      <p className="text-xs bg-green-50 text-green-700 rounded p-2 mt-2">解決メモ: {err.resolveNote}</p>
+                    )}
+                  </div>
+                  {err.status === "open" && (
+                    <div className="flex gap-2 flex-shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs gap-1 text-green-700 border-green-300 hover:bg-green-50"
+                        onClick={() => { setSelectedErrorId(err.id); setShowResolveDialog(true); }}
+                      >
+                        <CheckCircle size={12} /> 解決済みにする
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-xs text-muted-foreground"
+                        onClick={() => ignore.mutate({ id: err.id })}
+                      >
+                        <XCircle size={12} />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* 解決ダイアログ */}
+      <Dialog open={showResolveDialog} onOpenChange={(open) => { if (!open) { setShowResolveDialog(false); setSelectedErrorId(null); setResolveNote(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>エラーを解決済みにする</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">解決した方法や対応内容を記録してください（任意）</p>
+            <Textarea
+              rows={3}
+              value={resolveNote}
+              onChange={(e) => setResolveNote(e.target.value)}
+              placeholder="例: キャッシュクリアで解決 / コード修正済み（PR #123）"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowResolveDialog(false)}>キャンセル</Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => {
+                if (selectedErrorId) {
+                  resolve.mutate({ id: selectedErrorId, resolveNote: resolveNote || undefined });
+                }
+              }}
+            >
+              解決済みにする
             </Button>
           </DialogFooter>
         </DialogContent>
