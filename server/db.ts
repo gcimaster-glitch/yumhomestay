@@ -306,6 +306,23 @@ export async function getPaymentByBookingId(bookingId: number) {
   return result[0];
 }
 
+// 2段階決済用：同じ予約の全決済レコードを取得
+export async function getPaymentsByBookingId(bookingId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(payments).where(eq(payments.bookingId, bookingId));
+}
+
+// 2段階決済用：仮押さえ（20%）の決済レコードを取得
+export async function getDepositPaymentByBookingId(bookingId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(payments)
+    .where(eq(payments.bookingId, bookingId))
+    .limit(10);
+  return result.find(p => p.paymentType === "deposit");
+}
+
 export async function createPayment(data: typeof payments.$inferInsert) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");

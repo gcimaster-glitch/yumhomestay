@@ -219,10 +219,20 @@ export const bookings = mysqlTable("bookings", {
   // Dietary / special requests
   dietaryRestrictions: text("dietaryRestrictions"),
   specialRequests: text("specialRequests"),
+  // ─── 2段階決済フィールド（20%仮押さえ → 80%本決済）─────────────────────────────
+  depositAmountJpy: int("depositAmountJpy").default(0),       // 仮押さえ金額（合計の20%）
+  depositPaidAt: timestamp("depositPaidAt"),                   // 20%支払い完了日時
+  depositStripeSessionId: varchar("depositStripeSessionId", { length: 255 }), // 20%決済セッションID
+  finalPaymentAmountJpy: int("finalPaymentAmountJpy").default(0), // 残り80%金額
+  finalPaymentPaidAt: timestamp("finalPaymentPaidAt"),         // 80%支払い完了日時
+  finalPaymentStripeSessionId: varchar("finalPaymentStripeSessionId", { length: 255 }), // 80%決済セッションID
   // Status
   status: mysqlEnum("status", [
     "pending",
-    "pending_payment",
+    "pending_deposit",        // 20%仮押さえ決済中
+    "deposit_paid",           // 20%支払い済み・ホスト調整中
+    "awaiting_final_payment", // ホスト合意済み・80%支払い待ち
+    "pending_payment",        // 旧フロー互換（全額決済中）
     "confirmed",
     "completed",
     "cancelled_by_guest",
@@ -258,13 +268,14 @@ export type Booking = typeof bookings.$inferSelect;
 // ─── Payments ─────────────────────────────────────────────────────────────────
 export const payments = mysqlTable("payments", {
   id: int("id").autoincrement().primaryKey(),
-  bookingId: int("bookingId").notNull().unique(), // FK → bookings.id
+  bookingId: int("bookingId").notNull(), // FK → bookings.id（複数レコード可：deposit + final）
   stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 255 }).unique(),
   stripeSessionId: varchar("stripeSessionId", { length: 255 }),
   stripeChargeId: varchar("stripeChargeId", { length: 255 }),
   amount: int("amount").notNull(), // in guest currency minor units
   currency: varchar("currency", { length: 3 }).notNull(),
   amountJpy: int("amountJpy").notNull(),
+  paymentType: mysqlEnum("paymentType", ["deposit", "final", "full"]).default("full").notNull(), // 決済種別
   status: mysqlEnum("status", [
     "requires_payment_method",
     "requires_confirmation",

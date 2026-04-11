@@ -39,6 +39,7 @@ const Profile              = lazy(() => import("./pages/Profile"));
 const ReviewPage           = lazy(() => import("./pages/ReviewPage"));
 const AgentDashboard       = lazy(() => import("./pages/AgentDashboard"));
 const PaymentSuccess       = lazy(() => import("./pages/PaymentSuccess"));
+const PaymentDepositSuccess = lazy(() => import("./pages/PaymentDepositSuccess")); // 2段階決済: 20%仮押さえ完了ページ
 const PaymentCancel        = lazy(() => import("./pages/PaymentCancel"));
 const HostRegisterPaymentSuccess = lazy(() => import("./pages/HostRegisterPaymentSuccess"));
 const TroubleReport        = lazy(() => import("./pages/TroubleReport"));
@@ -136,6 +137,7 @@ function Router() {
 
         {/* Payment */}
         <Route path="/payment/success" component={PaymentSuccess} />
+        <Route path="/payment/deposit-success" component={PaymentDepositSuccess} /> {/* 2段階決済: 20%仮押さえ完了 */}
         <Route path="/payment/cancel" component={PaymentCancel} />
         <Route path="/host/register/payment/success" component={HostRegisterPaymentSuccess} />
 

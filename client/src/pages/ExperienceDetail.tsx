@@ -159,7 +159,8 @@ export default function ExperienceDetail() {
   };
 
   // ─── Mutations ─────────────────────────────────────────────────────────────
-  const createCheckoutSession = trpc.stripe.createCheckoutSession.useMutation({
+  // 2段階決済: STEP1 - 20%仮押さえ
+  const createDepositCheckoutSession = trpc.stripe.createDepositCheckoutSession.useMutation({
     onSuccess: (data) => {
       if (data.checkoutUrl) window.location.href = data.checkoutUrl;
     },
@@ -195,10 +196,11 @@ export default function ExperienceDetail() {
     onSuccess: (data) => {
       toast.success(t("experience.bookingAccepted"));
       setIsRedirectingToPayment(true);
-      createCheckoutSession.mutate({
+      // 2段階決済: まず20%仮押さえの決済ページへ遷移
+      createDepositCheckoutSession.mutate({
         bookingId: data.id,
         currency,
-        successPath: "/payment/success",
+        successPath: "/payment/deposit-success",
         cancelPath: "/payment/cancel",
       });
     },
@@ -718,6 +720,18 @@ export default function ExperienceDetail() {
                       <span>{t("booking.total")}({totalGuests}{t("common.person")})</span>
                       <span className="text-primary">¥{priceTotal.toLocaleString()}</span>
                     </div>
+                    {/* 2段階決済の内訳表示 */}
+                    <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 space-y-1">
+                      <div className="flex justify-between">
+                        <span>① 今回お支払い（20%仮押さえ）</span>
+                        <span className="font-bold">¥{Math.floor(priceTotal * 0.2).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-blue-600">
+                        <span>② ホスト確定後（80%本決済）</span>
+                        <span className="font-bold">¥{(priceTotal - Math.floor(priceTotal * 0.2)).toLocaleString()}</span>
+                      </div>
+                      <p className="text-blue-600 mt-1">※ ホストとの日程調整後に残ら80%を請求。不成立の場合は全額返金。</p>
+                    </div>
                   </div>
                   <p className="text-xs text-muted-foreground">✔ {t("experience.allIncluded")}</p>
 
@@ -769,7 +783,7 @@ export default function ExperienceDetail() {
                     ) : !selectedDate || !selectedSlotId ? (
                       t("experience.selectDateAndTime")
                     ) : (
-                      t("experience.bookAndPay")
+                      <span>予約・20%仮押さえへ進む ¥{Math.floor(priceTotal * 0.2).toLocaleString()}</span>
                     )}
                   </Button>
 

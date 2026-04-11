@@ -37,6 +37,8 @@ import { useTranslation } from "react-i18next";
 type BookingStatus =
   | "pending"
   | "pending_payment"
+  | "deposit_paid"            // 2段階決済: 20%仮押さえ済み
+  | "awaiting_final_payment"  // 2段階決済: 80%本決済待ち
   | "confirmed"
   | "completed"
   | "cancelled_by_guest"
@@ -98,6 +100,16 @@ export default function MyBookings() {
     pending_payment: {
       label: t("booking.status.pendingPayment"),
       color: "bg-orange-100 text-orange-800 border-orange-200",
+      icon: <CreditCard className="w-3 h-3" />,
+    },
+    deposit_paid: {
+      label: "仮押さえ済（20%）",
+      color: "bg-blue-100 text-blue-800 border-blue-200",
+      icon: <CreditCard className="w-3 h-3" />,
+    },
+    awaiting_final_payment: {
+      label: "本決済待ち（80%）",
+      color: "bg-purple-100 text-purple-800 border-purple-200",
       icon: <CreditCard className="w-3 h-3" />,
     },
     confirmed: {
@@ -204,7 +216,7 @@ export default function MyBookings() {
   }
 
   const activeBookings = bookings?.filter((b) =>
-    ["pending", "pending_payment", "confirmed"].includes(b.status)
+    ["pending", "pending_payment", "deposit_paid", "awaiting_final_payment", "confirmed"].includes(b.status)
   ) ?? [];
   const pastBookings = bookings?.filter((b) =>
     ["completed", "cancelled_by_guest", "cancelled_by_host", "cancelled_by_admin"].includes(b.status)
@@ -213,13 +225,28 @@ export default function MyBookings() {
   function BookingCard({ booking }: { booking: NonNullable<typeof bookings>[0] }) {
     const status = booking.status as BookingStatus;
     const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
-    const canCancel = ["pending", "pending_payment", "confirmed"].includes(booking.status);
+    const canCancel = ["pending", "pending_payment", "deposit_paid", "awaiting_final_payment", "confirmed"].includes(booking.status);
     const canSurvey = booking.status === "completed" && !booking.guestSurveySubmittedAt;
     const hasSurvey = booking.status === "completed" && !!booking.guestSurveySubmittedAt;
-    const needsPayment = booking.status === "pending_payment" || booking.status === "pending";
+    const needsDepositPayment = booking.status === "pending_payment" || booking.status === "pending";
+    const needsFinalPayment = booking.status === "awaiting_final_payment";
+    const isDepositPaid = booking.status === "deposit_paid";
 
     const [isRedirecting, setIsRedirecting] = useState(false);
-    const checkoutMutation = trpc.stripe.createCheckoutSession.useMutation({
+
+    // 2段階決済 STEP1: 20%仮押さえ
+    const depositCheckoutMutation = trpc.stripe.createDepositCheckoutSession.useMutation({
+      onSuccess: (data) => {
+        if (data.checkoutUrl) window.location.href = data.checkoutUrl;
+      },
+      onError: (err) => {
+        setIsRedirecting(false);
+        toast.error(t("booking.paymentError"), { description: err.message });
+      },
+    });
+
+    // 2段階決済 STEP2: 80%本決済
+    const finalCheckoutMutation = trpc.stripe.createFinalPaymentCheckoutSession.useMutation({
       onSuccess: (data) => {
         if (data.checkoutUrl) window.location.href = data.checkoutUrl;
       },
@@ -298,19 +325,75 @@ export default function MyBookings() {
             </div>
           )}
 
-          {/* Payment Banner */}
-          {needsPayment && (
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm">
-              <p className="text-orange-700 font-medium mb-2">
-                ⚠️ {t("booking.paymentPending")}
+          {/* Payment Banner: 20%仮押さえ待ち */}
+          {needsDepositPayment && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm space-y-2">
+              <p className="text-orange-700 font-medium">
+                ⚠️ 20%の仮押さえ金のお支払いが完了していません
               </p>
+              <div className="text-xs text-orange-600 space-y-0.5">
+                <div className="flex justify-between">
+                  <span>仮押さえ金（20%）</span>
+                  <span className="font-bold">¥{Math.floor((booking.amountJpy ?? 0) * 0.2).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>本決済（80%）はホスト確定後</span>
+                  <span>¥{(booking.amountJpy - Math.floor((booking.amountJpy ?? 0) * 0.2)).toLocaleString()}</span>
+                </div>
+              </div>
               <Button
                 size="sm"
                 className="w-full bg-orange-500 hover:bg-orange-600 text-white gap-2"
-                disabled={checkoutMutation.isPending || isRedirecting}
+                disabled={depositCheckoutMutation.isPending || isRedirecting}
                 onClick={() => {
                   setIsRedirecting(true);
-                  checkoutMutation.mutate({
+                  depositCheckoutMutation.mutate({
+                    bookingId: booking.id,
+                    currency: "JPY",
+                    successPath: "/payment/deposit-success",
+                    cancelPath: "/payment/cancel",
+                  });
+                }}
+              >
+                {(depositCheckoutMutation.isPending || isRedirecting) ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <CreditCard className="w-4 h-4" />
+                )}
+                20%仮押さえを支払う ¥{Math.floor((booking.amountJpy ?? 0) * 0.2).toLocaleString()}
+              </Button>
+            </div>
+          )}
+
+          {/* Payment Banner: 仮押さえ済み（ホスト調整中） */}
+          {isDepositPaid && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm space-y-1">
+              <p className="text-blue-700 font-medium">✅ 仮押さえ済み — ホストとの日程調整中</p>
+              <p className="text-xs text-blue-600">スタッフがホストに連絡中です。通常1～3営業日以内にご連絡します。</p>
+              <div className="flex justify-between text-xs">
+                <span>残ら80%の本決済額</span>
+                <span className="font-bold">¥{(booking.amountJpy - Math.floor((booking.amountJpy ?? 0) * 0.2)).toLocaleString()}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Payment Banner: 80%本決済待ち */}
+          {needsFinalPayment && (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm space-y-2">
+              <p className="text-purple-700 font-medium">
+                🎉 ホストが確定しました！残ら80%のお支払いをお願いします
+              </p>
+              <div className="flex justify-between text-xs text-purple-600">
+                <span>本決済額（80%）</span>
+                <span className="font-bold">¥{(booking.amountJpy - Math.floor((booking.amountJpy ?? 0) * 0.2)).toLocaleString()}</span>
+              </div>
+              <Button
+                size="sm"
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white gap-2"
+                disabled={finalCheckoutMutation.isPending || isRedirecting}
+                onClick={() => {
+                  setIsRedirecting(true);
+                  finalCheckoutMutation.mutate({
                     bookingId: booking.id,
                     currency: "JPY",
                     successPath: "/payment/success",
@@ -318,12 +401,12 @@ export default function MyBookings() {
                   });
                 }}
               >
-                {(checkoutMutation.isPending || isRedirecting) ? (
+                {(finalCheckoutMutation.isPending || isRedirecting) ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <CreditCard className="w-4 h-4" />
                 )}
-                {t("booking.proceedToPayment")}
+                残ら80%を支払って予約確定 ¥{(booking.amountJpy - Math.floor((booking.amountJpy ?? 0) * 0.2)).toLocaleString()}
               </Button>
             </div>
           )}
