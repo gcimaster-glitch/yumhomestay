@@ -94,6 +94,12 @@ export default function AdminDashboard() {
   const [showLeadReplyDialog, setShowLeadReplyDialog] = useState(false);
   const [showLeadDeleteDialog, setShowLeadDeleteDialog] = useState(false);
 
+  // Booking management state (2段階決済)
+  const [bookingStatusFilter, setBookingStatusFilter] = useState<"all" | "deposit_paid" | "awaiting_final_payment" | "confirmed" | "pending_payment">("deposit_paid");
+  const [showRefundDialog, setShowRefundDialog] = useState(false);
+  const [refundBookingId, setRefundBookingId] = useState<number | null>(null);
+  const [refundReason, setRefundReason] = useState("");
+
   // Availability calendar state
   const [availHostId, setAvailHostId] = useState<number | null>(null);
   const [availMonth, setAvailMonth] = useState<string>(() => {
@@ -123,6 +129,26 @@ export default function AdminDashboard() {
     { status: csStatusFilter },
     { enabled: isAuthenticated && user?.role === "admin" }
   );
+
+  // Booking management queries & mutations (2段階決済)
+  const { data: adminBookings, refetch: refetchAdminBookings } = trpc.booking.adminListBookings.useQuery(
+    { status: bookingStatusFilter === "all" ? undefined : bookingStatusFilter },
+    { enabled: isAuthenticated && user?.role === "admin" }
+  );
+  const approveDepositMutation = trpc.stripe.approveDepositForFinalPayment.useMutation({
+    onSuccess: () => { toast.success("ホスト合意を記録しました。ゲストに80%支払いリンクを通知しました。"); refetchAdminBookings(); },
+    onError: (err: { message: string }) => toast.error(err.message),
+  });
+  const fullRefundMutation = trpc.stripe.fullRefundDeposit.useMutation({
+    onSuccess: () => {
+      toast.success("全額返金が完了しました。");
+      setShowRefundDialog(false);
+      setRefundBookingId(null);
+      setRefundReason("");
+      refetchAdminBookings();
+    },
+    onError: (err: { message: string }) => toast.error(err.message),
+  });
 
   const approveHost = trpc.host.adminApprove.useMutation({
     onSuccess: () => { toast.success(t("admin.hostApproved")); refetchHosts(); },
@@ -446,6 +472,15 @@ export default function AdminDashboard() {
             <TabsTrigger value="error-monitor" className="flex items-center gap-1 text-destructive data-[state=active]:text-destructive">
               <AlertTriangle className="w-3.5 h-3.5" />
               エラー監視
+            </TabsTrigger>
+            <TabsTrigger value="bookings" className="flex items-center gap-1">
+              <DollarSign className="w-3.5 h-3.5" />
+              予約管理
+              {adminBookings?.filter(b => b.status === "deposit_paid").length ? (
+                <span className="ml-1 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+                  {adminBookings.filter(b => b.status === "deposit_paid").length}
+                </span>
+              ) : null}
             </TabsTrigger>
           </TabsList>
 
@@ -1142,8 +1177,157 @@ export default function AdminDashboard() {
           <TabsContent value="error-monitor" className="mt-4">
             <AdminErrorMonitorTab />
           </TabsContent>
+
+          {/* Booking Management tab (予約管理 / 2段階決済) */}
+          <TabsContent value="bookings" className="mt-4">
+            <div className="space-y-4">
+              {/* ステータスフィルター */}
+              <div className="flex gap-2 flex-wrap">
+                {(["deposit_paid", "awaiting_final_payment", "confirmed", "pending_payment", "all"] as const).map((s) => (
+                  <Button
+                    key={s}
+                    size="sm"
+                    variant={bookingStatusFilter === s ? "default" : "outline"}
+                    onClick={() => setBookingStatusFilter(s)}
+                  >
+                    {s === "all" ? "すべて" :
+                     s === "deposit_paid" ? "仮押さえ済（20%）" :
+                     s === "awaiting_final_payment" ? "本決済待ち（80%）" :
+                     s === "confirmed" ? "確定済み" :
+                     s === "pending_payment" ? "未払い" : s}
+                  </Button>
+                ))}
+                <Button size="sm" variant="ghost" onClick={() => refetchAdminBookings()}>
+                  <RefreshCw className="w-3.5 h-3.5 mr-1" />更新
+                </Button>
+              </div>
+
+              {/* 予約一覧 */}
+              {!adminBookings || adminBookings.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <p>該当する予約はありません</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {adminBookings.map((booking) => (
+                    <Card key={booking.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-sm">予約 #{booking.id}</span>
+                              <Badge variant="outline" className={
+                                booking.status === "deposit_paid" ? "bg-blue-100 text-blue-800 border-blue-200" :
+                                booking.status === "awaiting_final_payment" ? "bg-purple-100 text-purple-800 border-purple-200" :
+                                booking.status === "confirmed" ? "bg-emerald-100 text-emerald-800 border-emerald-200" :
+                                "bg-orange-100 text-orange-800 border-orange-200"
+                              }>
+                                {booking.status === "deposit_paid" ? "仮押さえ済（20%）" :
+                                 booking.status === "awaiting_final_payment" ? "本決済待ち（80%）" :
+                                 booking.status === "confirmed" ? "確定済み" :
+                                 booking.status === "pending_payment" ? "未払い" : booking.status}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {booking.experienceTitle ?? "体験名不明"}
+                            </p>
+                            <div className="text-xs text-muted-foreground space-y-0.5">
+                              <p>ゲスト: {booking.guestName ?? "不明"} ({booking.guestEmail ?? ""})</p>
+                              <p>参加: 大人{booking.adultsCount}名{booking.childrenCount ? ` / 子供${booking.childrenCount}名` : ""}</p>
+                              <p>体験日: {booking.startTime ? new Date(booking.startTime).toLocaleDateString("ja-JP") : "未設定"}</p>
+                              <div className="flex gap-4">
+                                <span>合計: ¥{(booking.amountJpy ?? 0).toLocaleString()}</span>
+                                <span className="text-blue-600">仮押さえ（20%）: ¥{(booking.depositAmountJpy ?? 0).toLocaleString()}</span>
+                                <span className="text-purple-600">残り80%: ¥{(booking.finalPaymentAmountJpy ?? 0).toLocaleString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                          {/* アクションボタン */}
+                          <div className="flex flex-col gap-2 min-w-[160px]">
+                            {booking.status === "deposit_paid" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1"
+                                  disabled={approveDepositMutation.isPending}
+                                  onClick={() => approveDepositMutation.mutate({ bookingId: booking.id })}
+                                >
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                  ホスト合意→残り80%請求
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="gap-1"
+                                  onClick={() => { setRefundBookingId(booking.id); setShowRefundDialog(true); }}
+                                >
+                                  <XCircle className="w-3.5 h-3.5" />
+                                  不成立・全額返金
+                                </Button>
+                              </>
+                            )}
+                            {booking.status === "awaiting_final_payment" && (
+                              <div className="text-xs text-purple-600 font-medium p-2 bg-purple-50 rounded">
+                                ゲストの80%支払い待ち
+                                <br />
+                                <span className="text-muted-foreground">ゲストに通知済み</span>
+                              </div>
+                            )}
+                            {booking.status === "confirmed" && (
+                              <div className="text-xs text-emerald-600 font-medium p-2 bg-emerald-50 rounded">
+                                決済完了・予約確定
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
         </Tabs>
+
       </div>
+      {/* ─── Refund Confirmation Dialog (全額返金確認) ─────────────────── */}
+      <Dialog open={showRefundDialog} onOpenChange={(open) => { if (!open) { setShowRefundDialog(false); setRefundBookingId(null); setRefundReason(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">全額返金の確認</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              予約 #{refundBookingId} の20%仮押さえ金を全額返金し、予約をキャンセルします。この操作は取り消せません。
+            </p>
+            <div>
+              <Label className="text-sm mb-1 block">返金理由（任意）</Label>
+              <Textarea
+                rows={3}
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+                placeholder="例：ホストの都合により受け入れ不可"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRefundDialog(false)}>キャンセル</Button>
+            <Button
+              variant="destructive"
+              disabled={fullRefundMutation.isPending}
+              onClick={() => {
+                if (refundBookingId) {
+                  fullRefundMutation.mutate({ bookingId: refundBookingId, reason: refundReason || undefined });
+                }
+              }}
+            >
+              {fullRefundMutation.isPending ? "処理中…" : "全額返金を実行する"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ─── Cooking School Detail Modal ───────────────────────────────────────────────────────── */}
       {/* ─── Lead Notes Dialog ─────────────────────────────────────────────────── */}
       <Dialog open={showLeadNotesDialog} onOpenChange={(open) => { if (!open) { setShowLeadNotesDialog(false); setSelectedLeadId(null); } }}>

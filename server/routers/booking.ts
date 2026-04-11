@@ -397,4 +397,77 @@ export const bookingRouter = router({
 
       return { success: true };
     }),
+
+  /** 管理者: 全予約を一覧取得（ステータスフィルター付き） */
+  adminListBookings: protectedProcedure
+    .input(z.object({
+      status: z.string().optional(), // "deposit_paid" | "awaiting_final_payment" | "all" など
+      limit: z.number().int().min(1).max(200).default(100),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { bookings: bookingsTable, users: usersTable, experiences: experiencesTable } = await import("../../drizzle/schema");
+      const { eq, desc, inArray } = await import("drizzle-orm");
+
+      let query = db
+        .select({
+          id: bookingsTable.id,
+          status: bookingsTable.status,
+          amountJpy: bookingsTable.amountJpy,
+          depositAmountJpy: bookingsTable.depositAmountJpy,
+          finalPaymentAmountJpy: bookingsTable.finalPaymentAmountJpy,
+          depositPaidAt: bookingsTable.depositPaidAt,
+          finalPaymentPaidAt: bookingsTable.finalPaymentPaidAt,
+          adultsCount: bookingsTable.adultsCount,
+          childrenCount: bookingsTable.childrenCount,
+          startTime: bookingsTable.startTime,
+          createdAt: bookingsTable.createdAt,
+          updatedAt: bookingsTable.updatedAt,
+          guestId: bookingsTable.guestId,
+          guestName: usersTable.name,
+          guestEmail: usersTable.email,
+          experienceId: bookingsTable.experienceId,
+          experienceTitle: experiencesTable.title,
+        })
+        .from(bookingsTable)
+        .leftJoin(usersTable, eq(bookingsTable.guestId, usersTable.id))
+        .leftJoin(experiencesTable, eq(bookingsTable.experienceId, experiencesTable.id))
+        .orderBy(desc(bookingsTable.createdAt));
+
+      const statusFilter = input?.status;
+      if (statusFilter && statusFilter !== "all") {
+        const rows = await db
+          .select({
+            id: bookingsTable.id,
+            status: bookingsTable.status,
+            amountJpy: bookingsTable.amountJpy,
+            depositAmountJpy: bookingsTable.depositAmountJpy,
+            finalPaymentAmountJpy: bookingsTable.finalPaymentAmountJpy,
+            depositPaidAt: bookingsTable.depositPaidAt,
+            finalPaymentPaidAt: bookingsTable.finalPaymentPaidAt,
+            adultsCount: bookingsTable.adultsCount,
+            childrenCount: bookingsTable.childrenCount,
+            startTime: bookingsTable.startTime,
+            createdAt: bookingsTable.createdAt,
+            updatedAt: bookingsTable.updatedAt,
+            guestId: bookingsTable.guestId,
+            guestName: usersTable.name,
+            guestEmail: usersTable.email,
+            experienceId: bookingsTable.experienceId,
+            experienceTitle: experiencesTable.title,
+          })
+          .from(bookingsTable)
+          .leftJoin(usersTable, eq(bookingsTable.guestId, usersTable.id))
+          .leftJoin(experiencesTable, eq(bookingsTable.experienceId, experiencesTable.id))
+          .where(eq(bookingsTable.status, statusFilter as any))
+          .orderBy(desc(bookingsTable.createdAt))
+          .limit(input?.limit ?? 100);
+        return rows;
+      }
+
+      const rows = await query.limit(input?.limit ?? 100);
+      return rows;
+    }),
 });
