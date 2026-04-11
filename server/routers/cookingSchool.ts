@@ -34,7 +34,7 @@ export const cookingSchoolRouter = router({
     )
     .query(async ({ input }) => {
       const schools = await getActiveCookingSchools(input.limit, input.offset);
-      return schools.filter((s) => {
+      return schools.filter((s: (typeof schools)[0]) => {
         if (input.prefecture && s.prefecture !== input.prefecture) return false;
         if (input.hasHalalKitchen && !s.hasHalalKitchen) return false;
         if (input.hasWheelchairAccess && !s.hasWheelchairAccess) return false;
@@ -205,7 +205,7 @@ export const cookingSchoolRouter = router({
     if (!school) return [];
     const rows = await getAllExperiencesByCookingSchoolId(school.id);
     // rows have shape { experiences: {...}, hosts: {...} } due to join
-    return rows.map((r) => (r as unknown as { experiences: typeof r }).experiences ?? r);
+    return rows.map((r: (typeof rows)[0]) => (r as unknown as { experiences: typeof r }).experiences ?? r);
   }),
 
   // ─── Admin ───────────────────────────────────────────────────────────────────

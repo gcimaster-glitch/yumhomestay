@@ -12,6 +12,7 @@ import {
   updateUser,
 } from "../db";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "../_core/trpc";
+import { cache, CACHE_KEYS, DEFAULT_TTL_SECONDS } from "../cache";
 
 export const hostRouter = router({
   // Public: list approved hosts
@@ -19,12 +20,16 @@ export const hostRouter = router({
     .input(z.object({ limit: z.number().default(20), offset: z.number().default(0) }).optional())
     .query(async ({ input }) => {
       const { limit = 20, offset = 0 } = input ?? {};
-      return getApprovedHosts(limit, offset);
+      // CTO: ホスト一覧は5分キャッシュ（トラフィックスパイク時のDB負荷軽減）
+      const cacheKey = `${CACHE_KEYS.HOSTS_APPROVED}:${limit}:${offset}`;
+      return cache.getOrSet(cacheKey, () => getApprovedHosts(limit, offset), DEFAULT_TTL_SECONDS);
     }),
 
   // Public: get host detail
   getById: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
-    const host = await getHostById(input.id);
+    // CTO: ホスト詳細は5分キャッシュ
+    const cacheKey = CACHE_KEYS.HOST_BY_ID(input.id);
+    const host = await cache.getOrSet(cacheKey, () => getHostById(input.id), DEFAULT_TTL_SECONDS);
     if (!host || host.approvalStatus !== "approved") throw new TRPCError({ code: "NOT_FOUND" });
     const { addressEncrypted, ...safe } = host;
     return safe;
@@ -140,7 +145,7 @@ export const hostRouter = router({
       const { limit = 50, offset = 0, status = "all" } = input ?? {};
       const allHosts = await getAllHosts(limit, offset);
       if (status === "all") return allHosts;
-      return allHosts.filter((h) => h.approvalStatus === status);
+      return allHosts.filter((h: (typeof allHosts)[0]) => h.approvalStatus === status);
     }),
 
   // Admin: approve host
@@ -247,8 +252,8 @@ export const hostRouter = router({
     .query(async () => {
       const allHosts = await getAllHosts(200, 0);
       return allHosts
-        .filter((h) => h.approvalStatus === "approved" && h.isActive)
-        .map((h) => ({
+        .filter((h: (typeof allHosts)[0]) => h.approvalStatus === "approved" && h.isActive)
+        .map((h: (typeof allHosts)[0]) => ({
           id: h.id,
           userId: h.userId,
           prefecture: h.prefecture,

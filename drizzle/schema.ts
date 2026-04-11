@@ -699,3 +699,24 @@ export const emailSignupTokens = mysqlTable("emailSignupTokens", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type EmailSignupToken = typeof emailSignupTokens.$inferSelect;
+export type InsertEmailSignupToken = typeof emailSignupTokens.$inferInsert;
+
+// ─── パートナーAPIキー管理 ────────────────────────────────────────────────────
+// OTA/代理店パートナー向けAPIキーの管理テーブル
+// 各パートナーは複数のAPIキーを持てる（ローテーション対応）
+export const apiKeys = mysqlTable("apiKeys", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),              // FK → users.id（管理者またはエージェント）
+  name: varchar("name", { length: 100 }).notNull(), // キーの用途名（例: "本番用", "テスト用"）
+  keyHash: varchar("keyHash", { length: 128 }).notNull().unique(), // SHA-256ハッシュ（平文は初回のみ表示）
+  keyPrefix: varchar("keyPrefix", { length: 12 }).notNull(), // 表示用プレフィックス（例: "yhs-abc123"）
+  scopes: text("scopes").notNull().default("read:experiences,create:bookings"), // 権限スコープ（カンマ区切り）
+  rateLimit: int("rateLimit").notNull().default(100), // 1分あたりのリクエスト上限
+  lastUsedAt: timestamp("lastUsedAt"),           // 最終使用日時
+  expiresAt: timestamp("expiresAt"),             // 有効期限（nullは無期限）
+  isActive: boolean("isActive").notNull().default(true), // 有効/無効フラグ
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type ApiKey = typeof apiKeys.$inferSelect;
+export type InsertApiKey = typeof apiKeys.$inferInsert;

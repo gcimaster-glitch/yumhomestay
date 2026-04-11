@@ -12,8 +12,11 @@ import {
   getExperienceById,
   getHostByUserId,
   getLatestExchangeRate,
+  getPaymentByBookingId,
   updateBooking,
+  updatePayment,
 } from "../db";
+import { calcRefund } from "../../shared/cancellation";
 import { protectedProcedure, router } from "../_core/trpc";
 import {
   YHS_BASE_PRICE_JPY,
@@ -211,19 +214,87 @@ export const bookingRouter = router({
     .mutation(async ({ ctx, input }) => {
       const booking = await getBookingById(input.id);
       if (!booking) throw new TRPCError({ code: "NOT_FOUND" });
-
       const host = await getHostByUserId(ctx.user.id);
       const isGuest = booking.guestId === ctx.user.id;
       const isHost = host && booking.hostId === host.id;
       const isAdmin = ctx.user.role === "admin";
-
       if (!isGuest && !isHost && !isAdmin) throw new TRPCError({ code: "FORBIDDEN" });
 
+      // キャンセル可能なステータスかチェック（完了済み・既キャンセルは不可）
+      const nonCancellableStatuses = ["completed", "cancelled_by_guest", "cancelled_by_host", "cancelled_by_admin"];
+      if (nonCancellableStatuses.includes(booking.status)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This booking cannot be cancelled." });
+      }
+
+      const cancelledBy: "guest" | "host" | "admin" = isAdmin ? "admin" : isGuest ? "guest" : "host";
       const cancelStatus = isAdmin
         ? "cancelled_by_admin"
         : isGuest
           ? "cancelled_by_guest"
           : "cancelled_by_host";
+
+      // ─── Stripe 自動返金処理 ─────────────────────────────────────────────────
+      let refundAmountJpy = 0;
+      let refundResult = null;
+      const payment = await getPaymentByBookingId(input.id);
+
+      if (payment && payment.status === "succeeded" && payment.stripePaymentIntentId) {
+        // 体験情報を取得してキャンセルポリシーを確認
+        const experience = await getExperienceById(booking.experienceId);
+        const policy = (experience?.cancellationPolicy ?? "moderate") as "flexible" | "moderate" | "strict";
+
+        // 返金額を計算
+        refundResult = calcRefund(policy, booking.startTime, booking.amountJpy, cancelledBy);
+        refundAmountJpy = refundResult.refundAmountJpy;
+
+        if (!refundResult.noRefund && refundAmountJpy > 0) {
+          try {
+            const stripeKey = process.env.STRIPE_SECRET_KEY;
+            if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
+            const Stripe = (await import("stripe")).default;
+            const stripe = new Stripe(stripeKey);
+
+            // Stripe Refund API を呼び出す
+            // JPY は minor unit が 1円 = 1 なのでそのまま渡す
+            const refund = await stripe.refunds.create({
+              payment_intent: payment.stripePaymentIntentId,
+              amount: refundAmountJpy, // JPY: 1 unit = 1 yen
+              reason: "requested_by_customer",
+              metadata: {
+                booking_id: String(booking.id),
+                cancelled_by: cancelledBy,
+                refund_reason: refundResult.reason,
+              },
+            });
+
+            // paymentsテーブルを更新
+            await updatePayment(payment.id, {
+              status: refundAmountJpy >= booking.amountJpy ? "refunded" : "succeeded",
+              refundedAt: new Date(),
+              refundReason: refundResult.reason,
+            });
+
+            console.log(`[Booking Cancel] Stripe refund created: refund_id=${refund.id}, booking_id=${booking.id}, amount_jpy=${refundAmountJpy}`);
+          } catch (refundErr) {
+            // 返金失敗はシステムエラーとして記録するが、キャンセル自体は続行する
+            // （管理者が手動で対応できるよう監査ログに記録）
+            console.error(`[Booking Cancel] Stripe refund FAILED for booking #${booking.id}:`, refundErr);
+            await createAuditLog({
+              userId: ctx.user.id,
+              action: "booking.refund_failed",
+              targetResource: "bookings",
+              targetId: String(input.id),
+              payload: JSON.stringify({
+                error: String(refundErr),
+                refundAmountJpy,
+                paymentIntentId: payment.stripePaymentIntentId,
+              }),
+              ipAddress: ctx.req.ip,
+            });
+          }
+        }
+      }
+      // ────────────────────────────────────────────────────────────────────────
 
       await updateBooking(input.id, {
         status: cancelStatus,
@@ -236,11 +307,20 @@ export const bookingRouter = router({
         action: "booking.cancel",
         targetResource: "bookings",
         targetId: String(input.id),
-        payload: JSON.stringify({ reason: input.reason }),
+        payload: JSON.stringify({
+          reason: input.reason,
+          cancelledBy,
+          refundAmountJpy,
+          refundReason: refundResult?.reason ?? "no_payment",
+        }),
         ipAddress: ctx.req.ip,
       });
 
-      return { success: true };
+      return {
+        success: true,
+        refundAmountJpy,
+        refundReason: refundResult?.reason ?? null,
+      };
     }),
 
   // Guest: submit post-completion survey

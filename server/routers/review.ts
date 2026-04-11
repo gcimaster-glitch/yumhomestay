@@ -58,7 +58,7 @@ export const reviewRouter = router({
       // Check for duplicate review
       const existing = await getReviewsByBookingId(input.bookingId);
       const authorType = isGuest ? "guest" : "host";
-      const alreadyReviewed = existing.some((r) => r.authorId === ctx.user.id && r.authorType === authorType);
+      const alreadyReviewed = existing.some((r: (typeof existing)[0]) => r.authorId === ctx.user.id && r.authorType === authorType);
       if (alreadyReviewed) throw new TRPCError({ code: "CONFLICT", message: "Already submitted review" });
 
       const recipientId = isGuest
@@ -82,8 +82,8 @@ export const reviewRouter = router({
 
       // Check if both sides have reviewed → publish both
       const updatedReviews = await getReviewsByBookingId(input.bookingId);
-      const guestReview = updatedReviews.find((r) => r.authorType === "guest");
-      const hostReview = updatedReviews.find((r) => r.authorType === "host");
+      const guestReview = updatedReviews.find((r: (typeof updatedReviews)[0]) => r.authorType === "guest");
+      const hostReview = updatedReviews.find((r: (typeof updatedReviews)[0]) => r.authorType === "host");
 
       if (guestReview && hostReview) {
         // Both submitted → publish both (blind review complete)
@@ -119,7 +119,7 @@ export const reviewRouter = router({
       const reviews = await getReviewsByBookingId(input.bookingId);
 
       // Non-admin: only show published reviews
-      if (!isAdmin) return reviews.filter((r) => r.isPublished);
+      if (!isAdmin) return reviews.filter((r: (typeof reviews)[0]) => r.isPublished);
       return reviews;
     }),
 
@@ -173,7 +173,7 @@ export const reviewRouter = router({
       const guestBookings = await getBookingsByGuestId(ctx.user.id);
       if (input.experienceId) {
         const hasCompletedBooking = guestBookings.some(
-          (b) => b.experienceId === input.experienceId && b.status === "completed"
+          (b: (typeof guestBookings)[0]) => b.experienceId === input.experienceId && b.status === "completed"
         );
         if (!hasCompletedBooking) {
           throw new TRPCError({

@@ -187,7 +187,7 @@ export const chatRouter = router({
 
           // Build message history (last 10 messages)
           const recentHistory = history.slice(-10);
-          const messages = recentHistory.map((msg) => ({
+          const messages = recentHistory.map((msg: (typeof recentHistory)[0]) => ({
             role: (msg.senderRole === "ai" ? "assistant" : "user") as "user" | "assistant",
             content: msg.content,
           }));

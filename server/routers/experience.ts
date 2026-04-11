@@ -11,17 +11,22 @@ import {
   updateExperience,
 } from "../db";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
+import { cache, CACHE_KEYS, DEFAULT_TTL_SECONDS, SHORT_TTL_SECONDS } from "../cache";
 
 export const experienceRouter = router({
   list: publicProcedure
     .input(z.object({ limit: z.number().default(20), offset: z.number().default(0) }).optional())
     .query(async ({ input }) => {
       const { limit = 20, offset = 0 } = input ?? {};
-      return getActiveExperiences(limit, offset);
+      // CTO: 一覧クエリは5分キャッシュ（トラフィックスパイク時のDB負荷軽減）
+      const cacheKey = `${CACHE_KEYS.EXPERIENCES_ALL}:${limit}:${offset}`;
+      return cache.getOrSet(cacheKey, () => getActiveExperiences(limit, offset), DEFAULT_TTL_SECONDS);
     }),
 
   getById: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
-    const exp = await getExperienceById(input.id);
+    // CTO: 個別体験は5分キャッシュ
+    const cacheKey = CACHE_KEYS.EXPERIENCES_BY_ID(input.id);
+    const exp = await cache.getOrSet(cacheKey, () => getExperienceById(input.id), DEFAULT_TTL_SECONDS);
     if (!exp || exp.approvalStatus !== "approved") throw new TRPCError({ code: "NOT_FOUND" });
     return exp;
   }),
@@ -74,6 +79,9 @@ export const experienceRouter = router({
         isActive: false,
       });
 
+      // CTO: 体験作成後はキャッシュを無効化
+      cache.delByPrefix("experiences:");
+
       await createAuditLog({
         userId: ctx.user.id,
         action: "experience.create",
@@ -87,7 +95,9 @@ export const experienceRouter = router({
   getRatingSummary: publicProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
-      return getExperienceRatingSummary(input.id);
+      // CTO: 評価サマリーは1分キャッシュ（リアルタイム性を維持しつつDB負荷軽減）
+      const cacheKey = CACHE_KEYS.RATING_SUMMARY(input.id);
+      return cache.getOrSet(cacheKey, () => getExperienceRatingSummary(input.id), SHORT_TTL_SECONDS);
     }),
 
   update: protectedProcedure
@@ -123,6 +133,11 @@ export const experienceRouter = router({
       if (imageUrls) updateData.imageUrls = JSON.stringify(imageUrls);
 
       await updateExperience(id, updateData as Parameters<typeof updateExperience>[1]);
+
+      // CTO: 体験更新後はキャッシュを無効化
+      cache.del(CACHE_KEYS.EXPERIENCES_BY_ID(id));
+      cache.delByPrefix("experiences:");
+
       return { success: true };
     }),
 });

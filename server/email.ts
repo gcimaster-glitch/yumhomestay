@@ -1204,3 +1204,28 @@ export async function sendWelcomeEmail(params: {
     </div>`;
   return sendEmail({ to, subject, html: baseTemplate(body, "ja") });
 }
+
+// ─── 新規登録メール確認（仮登録トークン送信）──────────────────────────────────
+export async function sendRegistrationVerificationEmail(params: {
+  to: string;
+  name: string;
+  verifyUrl: string;
+}): Promise<boolean> {
+  const { to, name, verifyUrl } = params;
+  const subject = "【YumHomeStay】メールアドレスの確認をお願いします";
+  const body = `
+    <h2>YumHomeStayへようこそ！</h2>
+    <p>${name} 様</p>
+    <p>ご登録ありがとうございます。<br>
+    以下のボタンをクリックして、メールアドレスの確認を完了してください。</p>
+    <p style="text-align:center;margin:32px 0;">
+      <a href="${verifyUrl}" class="btn">メールアドレスを確認する</a>
+    </p>
+    <div class="info-box">
+      <p style="margin:0;font-size:13px;color:#868e96;">
+        このリンクは<strong>24時間</strong>で無効になります。<br>
+        身に覚えのない場合は、このメールを無視してください。
+      </p>
+    </div>`;
+  return sendEmail({ to, subject, html: baseTemplate(body, "ja") });
+}

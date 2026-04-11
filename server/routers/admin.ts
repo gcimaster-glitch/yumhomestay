@@ -172,10 +172,10 @@ export const adminRouter = router({
     .query(async ({ input }) => {
       const all = await getAllCookingSchools(200, 0);
       const status = input?.status ?? "all";
-      const filtered = status === "all" ? all : all.filter((s) => s.approvalStatus === status);
+      const filtered = status === "all" ? all : all.filter((s: (typeof all)[0]) => s.approvalStatus === status);
       // Attach owner user info
       const withOwner = await Promise.all(
-        filtered.map(async (school) => {
+        filtered.map(async (school: (typeof all)[0]) => {
           const owner = await getUserById(school.userId);
           return {
             ...school,
@@ -268,8 +268,8 @@ export const adminRouter = router({
   listApprovedHosts: adminProcedure.query(async () => {
     const hosts = await getAllHosts(500, 0);
     return hosts
-      .filter((h) => h.approvalStatus === "approved")
-      .map((h) => ({
+      .filter((h: (typeof hosts)[0]) => h.approvalStatus === "approved")
+      .map((h: (typeof hosts)[0]) => ({
         id: h.id,
         userId: h.userId,
         prefecture: h.prefecture,

@@ -7,6 +7,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAuth } from "./_core/hooks/useAuth";
 import TermsAgreementModal from "./components/TermsAgreementModal";
+import OnboardingModal, { useOnboarding } from "./components/OnboardingModal";
 import { trpc } from "@/lib/trpc";
 
 // ─── Eager-loaded pages (critical path: LCP / first-paint) ───────────────────
@@ -42,6 +43,7 @@ const HostRegisterPaymentSuccess = lazy(() => import("./pages/HostRegisterPaymen
 const TroubleReport        = lazy(() => import("./pages/TroubleReport"));
 const VerifyEmail          = lazy(() => import("./pages/VerifyEmail"));
 const ResetPassword        = lazy(() => import("./pages/ResetPassword"));
+const ApiKeys              = lazy(() => import("./pages/ApiKeys"));
 const DemoLogin            = lazy(() => import("./pages/DemoLogin"));
 const Login                = lazy(() => import("./pages/Login"));
 const DemoHost             = lazy(() => import("./pages/DemoHost"));
@@ -162,6 +164,7 @@ function Router() {
         <Route path="/demo/cooking-school" component={DemoCookingSchool} />
         <Route path="/demo/agent" component={DemoAgent} />
         <Route path="/kyc" component={KycSubmit} />
+        <Route path="/api-keys" component={ApiKeys} />
 
         {/* Partner Thanks */}
         <Route path="/thanks/partner" component={PartnerThanks} />
@@ -186,9 +189,13 @@ function Router() {
 function TermsGuard({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, loading, refresh } = useAuth();
   const utils = trpc.useUtils();
+  const { show: showOnboarding, dismiss: dismissOnboarding } = useOnboarding();
 
   // 認証済みかつ termsAgreedAt が null の場合にモーダル表示
   const needsTermsAgreement = isAuthenticated && user && !user.termsAgreedAt;
+
+  // オンボーディングは認証済みかつ利用規約同意済みの場合のみ表示
+  const showOnboardingModal = isAuthenticated && user && !!user.termsAgreedAt && showOnboarding;
 
   if (loading) return <>{children}</>;
 
@@ -202,6 +209,13 @@ function TermsGuard({ children }: { children: React.ReactNode }) {
             utils.auth.me.invalidate();
             refresh();
           }}
+        />
+      )}
+      {/* CMO: 初回ログイン後のオンボーディングモーダル（利用規約同意済みユーザーのみ） */}
+      {showOnboardingModal && (
+        <OnboardingModal
+          userName={user?.name}
+          onClose={dismissOnboarding}
         />
       )}
     </>

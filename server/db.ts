@@ -40,7 +40,8 @@ import {
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
-let _db: ReturnType<typeof drizzle> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _db: any = null;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -1062,14 +1063,14 @@ export async function getUnreadChatCountForGuest(userId: number) {
     .from(guestInquiries)
     .where(eq(guestInquiries.userId, userId));
   if (myInquiries.length === 0) return 0;
-  const inquiryIds = myInquiries.map((i) => i.id);
+  const inquiryIds = myInquiries.map((i: { id: number }) => i.id);
   const [row] = await db
     .select({ count: sql<number>`count(*)` })
     .from(bookingChats)
     .where(
       and(
         eq(bookingChats.isReadByGuest, false),
-        or(...inquiryIds.map((id) => eq(bookingChats.inquiryId, id)))
+        or(...inquiryIds.map((id: number) => eq(bookingChats.inquiryId, id)))
       )
     );
   return Number(row?.count ?? 0);
@@ -1086,14 +1087,14 @@ export async function getUnreadChatCountForHost(hostUserId: number) {
     .innerJoin(hosts, eq(guestInquiries.assignedHostId, hosts.id))
     .where(eq(hosts.userId, hostUserId));
   if (myInquiries.length === 0) return 0;
-  const inquiryIds = myInquiries.map((i) => i.id);
+  const inquiryIds = myInquiries.map((i: { id: number }) => i.id);
   const [row] = await db
     .select({ count: sql<number>`count(*)` })
     .from(bookingChats)
     .where(
       and(
         eq(bookingChats.isReadByAdmin, false),
-        or(...inquiryIds.map((id) => eq(bookingChats.inquiryId, id)))
+        or(...inquiryIds.map((id: number) => eq(bookingChats.inquiryId, id)))
       )
     );
   return Number(row?.count ?? 0);
@@ -1109,11 +1110,11 @@ export async function getHostChatThreads(hostUserId: number) {
     .innerJoin(hosts, eq(guestInquiries.assignedHostId, hosts.id))
     .where(eq(hosts.userId, hostUserId));
   if (myInquiries.length === 0) return [];
-  const inquiryIds = myInquiries.map((i) => i.id);
+  const inquiryIds = myInquiries.map((i: { id: number; guestName: string | null }) => i.id);
   return db
     .select()
     .from(bookingChats)
-    .where(or(...inquiryIds.map((id) => eq(bookingChats.inquiryId, id))))
+    .where(or(...inquiryIds.map((id: number) => eq(bookingChats.inquiryId, id))))
     .orderBy(desc(bookingChats.createdAt))
     .limit(200);
 }

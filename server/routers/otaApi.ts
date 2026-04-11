@@ -105,14 +105,14 @@ export function registerOtaApiRoutes(app: Express) {
       const cuisineType = req.query.cuisineType as string | undefined;
       let filtered = rows;
       if (prefecture) {
-        filtered = filtered.filter(r => r.hostPrefecture === prefecture);
+        filtered = filtered.filter((r: (typeof filtered)[0]) => r.hostPrefecture === prefecture);
       }
       if (cuisineType) {
-        filtered = filtered.filter(r => r.cuisineType === cuisineType);
+        filtered = filtered.filter((r: (typeof filtered)[0]) => r.cuisineType === cuisineType);
       }
 
       res.json({
-        data: filtered.map(r => ({
+        data: filtered.map((r: (typeof filtered)[0]) => ({
           ...r,
           imageUrls: r.imageUrls ? JSON.parse(r.imageUrls) : [],
           dietaryOptions: r.dietaryOptions ? JSON.parse(r.dietaryOptions) : [],

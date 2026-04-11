@@ -22,7 +22,7 @@ import { getSessionCookieOptions } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
 import {
   sendPasswordResetEmail,
-  sendEmailVerificationEmail,
+  sendRegistrationVerificationEmail,
   sendWelcomeEmail,
 } from "../email";
 
@@ -70,7 +70,7 @@ const registerStep1 = publicProcedure
 
     // 確認メール送信
     const verifyUrl = `https://www.yumhomestay.com/api/auth/verify-email?token=${token}`;
-    await sendEmailVerificationEmail({
+    await sendRegistrationVerificationEmail({
       to: input.email,
       name: input.name,
       verifyUrl,

@@ -95,6 +95,8 @@ export default function ExperienceDetail() {
   const [inquiryDates, setInquiryDates] = useState("");
   const [inquiryCount, setInquiryCount] = useState(2);
   const [inquiryMessage, setInquiryMessage] = useState("");
+  // ─── CCO: 決済前の特商法・キャンセルポリシー同意 ─────────────────────────────
+  const [consentAgreed, setConsentAgreed] = useState(false);
 
   // ─── Data fetching ─────────────────────────────────────────────────────────
   const { data: exp, isLoading } = trpc.experience.getById.useQuery({ id: Number(id) });
@@ -214,6 +216,11 @@ export default function ExperienceDetail() {
     }
     if (adults < 2) {
       toast.error(t("experience.minAdults"));
+      return;
+    }
+    // CCO: 特商法・キャンセルポリシーの同意確認（法的証拠のため必須）
+    if (!consentAgreed) {
+      toast.error(t("booking.consentRequired"));
       return;
     }
     const startTime = new Date(`${selectedDate}T${selectedSlotTime}:00`).toISOString();
@@ -722,11 +729,33 @@ export default function ExperienceDetail() {
                     </div>
                   )}
 
+                  {/* CCO: 特商法・キャンセルポリシー同意チェックボックス（法的証拠のため必須） */}
+                  <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={consentAgreed}
+                        onChange={e => setConsentAgreed(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 accent-orange-500 shrink-0"
+                      />
+                      <span className="text-xs text-amber-800 leading-relaxed">
+                        {t("booking.consentLabel")}
+                        {exp?.cancellationPolicy && (
+                          <span className="block mt-1 font-medium">
+                            「{t(`experience.${exp.cancellationPolicy}`)}」ポリシー:
+                            {exp.cancellationPolicy === "flexible" && " 7日以上前:全額 / 3−6日前:50% / 3日未満:返金なし"}
+                            {exp.cancellationPolicy === "moderate" && " 14日以上前:全額 / 7−13日前:50% / 7日未満:返金なし"}
+                            {exp.cancellationPolicy === "strict" && " 30日以上前:全額 / 14−29日前:50% / 14日未満:返金なし"}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  </div>
                   <Button
                     className="w-full mt-2"
                     size="lg"
                     onClick={handleBook}
-                    disabled={!canBook || createBooking.isPending || isRedirectingToPayment}
+                    disabled={!canBook || !consentAgreed || createBooking.isPending || isRedirectingToPayment}
                   >
                     {isRedirectingToPayment ? (
                       <span className="flex items-center gap-2">
