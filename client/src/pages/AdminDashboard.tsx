@@ -2072,6 +2072,10 @@ function AdminErrorMonitorTab() {
   const [resolveNote, setResolveNote] = useState("");
   const [showResolveDialog, setShowResolveDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<"list" | "chart" | "surge" | "recurrence">("list");
+  // 詳細パネル用state
+  const [showDetailPanel, setShowDetailPanel] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [selectedDetailError, setSelectedDetailError] = useState<any>(null);
 
   const isAdmin = isAuthenticated && user?.role === "admin";
 
@@ -2339,26 +2343,36 @@ function AdminErrorMonitorTab() {
                             </p>
                           )}
                         </div>
-                        {err.status === "open" && (
-                          <div className="flex gap-2 flex-shrink-0">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-xs gap-1 text-green-700 border-green-300 hover:bg-green-50"
-                              onClick={() => { setSelectedErrorId(err.id); setShowResolveDialog(true); }}
-                            >
-                              <CheckCircle size={12} /> 解決済み
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-xs text-muted-foreground"
-                              onClick={() => ignore.mutate({ id: err.id })}
-                            >
-                              <XCircle size={12} />
-                            </Button>
-                          </div>
-                        )}
+                        <div className="flex gap-2 flex-shrink-0 flex-col items-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-xs gap-1 text-blue-700 border-blue-300 hover:bg-blue-50 w-full"
+                            onClick={() => { setSelectedDetailError(err); setShowDetailPanel(true); }}
+                          >
+                            🔍 詳細を見る
+                          </Button>
+                          {err.status === "open" && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs gap-1 text-green-700 border-green-300 hover:bg-green-50 w-full"
+                                onClick={() => { setSelectedErrorId(err.id); setShowResolveDialog(true); }}
+                              >
+                                <CheckCircle size={12} /> 解決済み
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-xs text-muted-foreground"
+                                onClick={() => ignore.mutate({ id: err.id })}
+                              >
+                                <XCircle size={12} />
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -2532,6 +2546,215 @@ function AdminErrorMonitorTab() {
               );
             })
           )}
+        </div>
+      )}
+
+      {/* エラー詳細パネル（スライドオーバー） */}
+      {showDetailPanel && selectedDetailError && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* オーバーレイ */}
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setShowDetailPanel(false)}
+          />
+          {/* パネル本体 */}
+          <div className="relative w-full max-w-2xl bg-white shadow-2xl overflow-y-auto flex flex-col">
+            {/* ヘッダー */}
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between z-10">
+              <div>
+                <h2 className="text-lg font-bold text-foreground">エラー詳細</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">ID: #{selectedDetailError.id}</p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setShowDetailPanel(false)}>✕ 閉じる</Button>
+            </div>
+            <div className="flex-1 p-6 space-y-6">
+              {/* 基本情報 */}
+              <section>
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">基本情報</h3>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {(() => {
+                      const severityColors: Record<string, string> = {
+                        critical: "bg-red-100 text-red-800 border-red-300",
+                        high: "bg-orange-100 text-orange-800 border-orange-300",
+                        medium: "bg-yellow-100 text-yellow-800 border-yellow-300",
+                        low: "bg-gray-100 text-gray-600 border-gray-300",
+                      };
+                      const statusColors: Record<string, string> = {
+                        open: "bg-red-100 text-red-700 border-red-200",
+                        resolved: "bg-green-100 text-green-700 border-green-200",
+                        ignored: "bg-gray-100 text-gray-500 border-gray-200",
+                        investigating: "bg-blue-100 text-blue-700 border-blue-200",
+                      };
+                      return (
+                        <>
+                          <Badge className={`text-xs border ${statusColors[selectedDetailError.status] ?? ""}`}>
+                            {selectedDetailError.status === "open" ? "未解決" : selectedDetailError.status === "resolved" ? "解決済み" : selectedDetailError.status === "investigating" ? "調査中" : "無視"}
+                          </Badge>
+                          <Badge className={`text-xs border ${severityColors[selectedDetailError.severity] ?? ""}`}>{selectedDetailError.severity}</Badge>
+                          <Badge className="text-xs bg-gray-100 text-gray-700">{selectedDetailError.source}</Badge>
+                          <Badge className="text-xs bg-blue-100 text-blue-700">発生 {selectedDetailError.occurrenceCount}回</Badge>
+                        </>
+                      );
+                    })()}
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1">エラータイプ</p>
+                    <p className="font-mono text-sm font-semibold text-red-700">{selectedDetailError.errorType}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1">エラーメッセージ</p>
+                    <p className="text-sm">{selectedDetailError.message}</p>
+                  </div>
+                </div>
+              </section>
+
+              {/* 発生情報 */}
+              <section>
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">発生情報</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-gray-50 rounded-lg p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1">最終発生日時</p>
+                    <p className="text-sm font-medium">{new Date(selectedDetailError.updatedAt).toLocaleString("ja-JP")}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1">初回発生日時</p>
+                    <p className="text-sm font-medium">{new Date(selectedDetailError.createdAt).toLocaleString("ja-JP")}</p>
+                  </div>
+                  {selectedDetailError.url && (
+                    <div className="col-span-2 bg-gray-50 rounded-lg p-3 border">
+                      <p className="text-xs text-muted-foreground mb-1">発生URL</p>
+                      <a href={selectedDetailError.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline break-all">
+                        {selectedDetailError.url}
+                      </a>
+                    </div>
+                  )}
+                  {selectedDetailError.userId && (
+                    <div className="bg-gray-50 rounded-lg p-3 border">
+                      <p className="text-xs text-muted-foreground mb-1">ユーザーID</p>
+                      <p className="text-sm font-mono">#{selectedDetailError.userId}</p>
+                    </div>
+                  )}
+                  {selectedDetailError.ipAddress && (
+                    <div className="bg-gray-50 rounded-lg p-3 border">
+                      <p className="text-xs text-muted-foreground mb-1">IPアドレス</p>
+                      <p className="text-sm font-mono">{selectedDetailError.ipAddress}</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* ブラウザ情報 */}
+              {selectedDetailError.userAgent && (
+                <section>
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">ブラウザ / クライアント情報</h3>
+                  <div className="bg-gray-50 rounded-lg p-3 border">
+                    <p className="text-xs font-mono text-gray-600 break-all">{selectedDetailError.userAgent}</p>
+                  </div>
+                </section>
+              )}
+
+              {/* スタックトレース */}
+              {selectedDetailError.stack && (
+                <section>
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">スタックトレース</h3>
+                  <div className="bg-gray-900 rounded-lg p-4 border overflow-x-auto">
+                    <pre className="text-xs text-green-400 whitespace-pre-wrap break-all font-mono leading-relaxed">{selectedDetailError.stack}</pre>
+                  </div>
+                </section>
+              )}
+
+              {/* AI修正提案 / コンテキスト */}
+              {selectedDetailError.context && (() => {
+                try {
+                  const ctx = JSON.parse(selectedDetailError.context);
+                  return (
+                    <section>
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">AI分析・修正提案</h3>
+                      <div className="space-y-3">
+                        {ctx.category && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">カテゴリ:</span>
+                            <Badge className="text-xs bg-indigo-100 text-indigo-700">{ctx.category}</Badge>
+                            {ctx.aiEnhanced && <Badge className="text-xs bg-gradient-to-r from-violet-500 to-purple-600 text-white">✨ AI分析済み</Badge>}
+                          </div>
+                        )}
+                        {ctx.fixSuggestion && (
+                          <div className={`rounded-lg p-4 border ${ctx.aiEnhanced ? "bg-violet-50 border-violet-200" : "bg-blue-50 border-blue-200"}`}>
+                            <p className={`text-xs font-semibold mb-2 ${ctx.aiEnhanced ? "text-violet-700" : "text-blue-700"}`}>
+                              {ctx.aiEnhanced ? "✨ AI修正提案" : "💡 修正提案"}
+                            </p>
+                            <p className={`text-sm ${ctx.aiEnhanced ? "text-violet-800" : "text-blue-800"}`}>{ctx.fixSuggestion}</p>
+                          </div>
+                        )}
+                        {ctx.component && (
+                          <div className="bg-gray-50 rounded-lg p-3 border">
+                            <p className="text-xs text-muted-foreground mb-1">発生コンポーネント</p>
+                            <p className="text-sm font-mono">{ctx.component}</p>
+                          </div>
+                        )}
+                        {ctx.route && (
+                          <div className="bg-gray-50 rounded-lg p-3 border">
+                            <p className="text-xs text-muted-foreground mb-1">発生ルート</p>
+                            <p className="text-sm font-mono">{ctx.route}</p>
+                          </div>
+                        )}
+                      </div>
+                    </section>
+                  );
+                } catch {
+                  return null;
+                }
+              })()}
+
+              {/* 解決情報 */}
+              {selectedDetailError.resolvedAt && (
+                <section>
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">解決情報</h3>
+                  <div className="space-y-2">
+                    <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                      <p className="text-xs text-muted-foreground mb-1">解決日時</p>
+                      <p className="text-sm font-medium text-green-700">{new Date(selectedDetailError.resolvedAt).toLocaleString("ja-JP")}</p>
+                    </div>
+                    {selectedDetailError.resolvedNote && (
+                      <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                        <p className="text-xs text-muted-foreground mb-1">解決メモ</p>
+                        <p className="text-sm text-green-800">{selectedDetailError.resolvedNote}</p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {/* アクションボタン */}
+              {selectedDetailError.status === "open" && (
+                <section className="border-t pt-4">
+                  <div className="flex gap-3">
+                    <Button
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white gap-2"
+                      onClick={() => {
+                        setSelectedErrorId(selectedDetailError.id);
+                        setShowDetailPanel(false);
+                        setShowResolveDialog(true);
+                      }}
+                    >
+                      <CheckCircle size={14} /> 解決済みにする
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="text-muted-foreground"
+                      onClick={() => {
+                        ignore.mutate({ id: selectedDetailError.id });
+                        setShowDetailPanel(false);
+                      }}
+                    >
+                      <XCircle size={14} /> 無視
+                    </Button>
+                  </div>
+                </section>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
