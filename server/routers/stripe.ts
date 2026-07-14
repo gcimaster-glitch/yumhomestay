@@ -708,8 +708,6 @@ export function registerStripeWebhook(app: import("express").Express) {
                     const [experience] = await db.select().from(experiencesTable).where(eq(experiencesTable.id, booking.experienceId)).limit(1);
                     if (guest?.email && experience) {
                       // 仮押さえ完了メール（ホスト調整中の旨を伝える）
-                      const { sendEmail: _send } = await import("../email").catch(() => ({ sendEmail: null }));
-                      const { Resend } = await import("resend").catch(() => ({ Resend: null }));
                       // sendGuestPaymentLinkEmailを仮押さえ完了通知として代用
                       const { sendGuestPaymentLinkEmail } = await import("../email");
                       await sendGuestPaymentLinkEmail({

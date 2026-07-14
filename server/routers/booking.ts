@@ -15,6 +15,7 @@ import {
   getPaymentByBookingId,
   updateBooking,
   updatePayment,
+  getDb,
 } from "../db";
 import { calcRefund } from "../../shared/cancellation";
 import { protectedProcedure, router } from "../_core/trpc";
@@ -429,7 +430,7 @@ export const bookingRouter = router({
           guestName: usersTable.name,
           guestEmail: usersTable.email,
           experienceId: bookingsTable.experienceId,
-          experienceTitle: experiencesTable.title,
+          experienceTitle: experiencesTable.titleJa,
         })
         .from(bookingsTable)
         .leftJoin(usersTable, eq(bookingsTable.guestId, usersTable.id))
@@ -456,7 +457,7 @@ export const bookingRouter = router({
             guestName: usersTable.name,
             guestEmail: usersTable.email,
             experienceId: bookingsTable.experienceId,
-            experienceTitle: experiencesTable.title,
+            experienceTitle: experiencesTable.titleJa,
           })
           .from(bookingsTable)
           .leftJoin(usersTable, eq(bookingsTable.guestId, usersTable.id))
