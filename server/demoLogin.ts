@@ -8,6 +8,9 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { sdk } from "./_core/sdk";
 import { getSessionCookieOptions } from "./_core/cookies";
 import * as db from "./db";
+import { getDb } from "./db";
+import { hosts, users } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
 
 // デモアカウントの定義
 const DEMO_ACCOUNTS = [
@@ -18,6 +21,8 @@ const DEMO_ACCOUNTS = [
     email: "demo-host@yumhomestay.demo",
     redirectPath: "/host/dashboard",
     label: "ホストファミリー デモ",
+    userType: "host" as const,
+    setupHost: true,
   },
   {
     key: "cooking_school",
@@ -26,6 +31,8 @@ const DEMO_ACCOUNTS = [
     email: "demo-cooking@yumhomestay.demo",
     redirectPath: "/cooking-school/dashboard",
     label: "料理教室 デモ",
+    userType: "host" as const,
+    setupHost: false,
   },
   {
     key: "agent",
@@ -34,6 +41,8 @@ const DEMO_ACCOUNTS = [
     email: "demo-agent@yumhomestay.demo",
     redirectPath: "/agent/dashboard",
     label: "旅行代理店 デモ",
+    userType: "guest" as const,
+    setupHost: false,
   },
 ] as const;
 
@@ -68,6 +77,50 @@ export function registerDemoLoginRoutes(app: Express) {
         loginMethod: "demo",
         lastSignedIn: new Date(),
       });
+
+      // ホストデモの場合、hostsテーブルにもレコードを作成
+      if (account.setupHost) {
+        const dbConn = await getDb();
+        if (dbConn) {
+          // usersテーブルからユーザーIDを取得
+          const userRows = await dbConn.select({ id: users.id })
+            .from(users)
+            .where(eq(users.openId, account.openId))
+            .limit(1);
+          const userId = userRows[0]?.id;
+
+          if (userId) {
+            // hostsテーブルにレコードが存在しなければ作成
+            const existingHost = await dbConn.select({ id: hosts.id })
+              .from(hosts)
+              .where(eq(hosts.userId, userId))
+              .limit(1);
+
+            if (!existingHost[0]) {
+              await dbConn.insert(hosts).values({
+                userId,
+                hostType: "individual",
+                bioJa: "東京在住のホストファミリーです。日本の家庭料理を一緒に楽しみましょう！",
+                bioEn: "We are a host family based in Tokyo. Let's enjoy Japanese home cooking together!",
+                nearestStation: "品川駅",
+                prefecture: "東京都",
+                city: "港区",
+                languages: JSON.stringify(["ja", "en"]),
+                familyMemberCount: 4,
+                canCookTogether: true,
+                hasInsurance: true,
+                registrationFeePaid: true,
+                trainingCompleted: true,
+                approvalStatus: "approved",
+                isActive: true,
+                approvedAt: new Date(),
+                minSessionHours: 3,
+                maxSessionHours: 5,
+              });
+            }
+          }
+        }
+      }
 
       // セッショントークンを発行
       const sessionToken = await sdk.createSessionToken(account.openId, {
